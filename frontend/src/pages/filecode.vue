@@ -7,11 +7,11 @@
       <div class="flex items-center gap-4">
         <img src="@/assets/images/logo.png" alt="Logo" class="object-contain"
           :style="{ maxHeight: '80%', width: '15%', height: 'auto' }" />
-        <span class="text-lg text-black">File name</span>
+        <span class="text-lg text-black">{{ fileName }}</span>  <!-- File name displayed here -->
       </div>
       <!-- Action Buttons Section -->
       <div class="flex items-center gap-4">
-        <button class="bg-[rgba(40,41,71,1)] text-white px-4 py-2 rounded hover:bg-[#797a9c] transition">Save</button>
+        <button @click="saveCode" class="bg-[rgba(40,41,71,1)] text-white px-4 py-2 rounded hover:bg-[#797a9c] transition">Save</button>
         <button class="bg-[rgba(40,41,71,1)] text-white px-4 py-2 rounded hover:bg-[#797a9c] transition">Share</button>
       </div>
     </header>
@@ -19,10 +19,9 @@
     <!-- Main Content Area -->
     <div class="flex flex-1 overflow-hidden relative">
       <!-- Code Editor -->
-      <div class="bg-gray-900 p-4 flex-shrink-0 h-full overflow-y-auto" :style="{ width: `${codeEditorWidth}px` }">
-        <textarea v-model="codeContent" placeholder="Write your code here..."
-          class="w-full h-full bg-transparent text-white text-lg outline-none resize-none font-mono p-4"
-          @input="updateCode"></textarea>
+      <div class="bg-gray-900 p-4 flex-shrink-0 h-full overflow-y-auto " :style="{ width: `${codeEditorWidth}px` }">
+        <!-- CodeMirror Editor -->
+        <div ref="codeMirrorContainer" class="w-full h-full"></div>
       </div>
 
       <!-- Resize Handle -->
@@ -43,9 +42,18 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
+import { useRoute } from 'vue-router';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
+import { EditorView, basicSetup } from 'codemirror';
+import { javascript } from '@codemirror/lang-javascript';
+import { oneDark } from '@codemirror/theme-one-dark';
+
+const route = useRoute();
+const codeMirrorContainer = ref(null);
+const editor = ref(null);
+const fileName = ref(""); // Store filename
 
 // Constants for minimum widths
 const MIN_EDITOR_WIDTH = 400;
@@ -58,18 +66,46 @@ const fitAddon = ref(null);
 
 // Reactive state
 const codeContent = ref('');
-const consoleOutput = ref('No output yet...');
 const codeEditorWidth = ref(0);
 const consoleWidth = ref(0);
 
-// Calculate initial widths and setup terminal
+const fetchFileDetails = async () => {
+  try {
+    const uuid = route.params.uuid;
+    const response = await fetch(`http://decode.local:8080/api/method/decode.api.getfiles?search_uuid=${uuid}`, {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    const data = await response.json();
+    if (data.message && data.message.file) {
+      fileName.value = data.message.file.filename;
+      if (editor.value) {
+        editor.value.dispatch({
+          changes: {
+            from: 0,
+            to: editor.value.state.doc.length,
+            insert: data.message.file.code || ''
+          }
+        });
+      }
+    }
+  } catch (error) {
+    console.error("Error fetching file details:", error);
+    if (terminal.value) {
+      terminal.value.writeln('Error loading file data...');
+    }
+  }
+};
+
 onMounted(() => {
   const totalWidth = window.innerWidth;
-  // Set initial widths - 70% for editor, 30% for console
   codeEditorWidth.value = Math.floor(totalWidth * 0.7);
-  consoleWidth.value = totalWidth - codeEditorWidth.value - 8; // 8px for resize handle
+  consoleWidth.value = totalWidth - codeEditorWidth.value - 8;
 
-  // Initialize terminal
   terminal.value = new Terminal({
     theme: {
       background: '#000000',
@@ -86,45 +122,38 @@ onMounted(() => {
     allowTransparency: true
   });
 
-  // Initialize fit addon
   fitAddon.value = new FitAddon();
   terminal.value.loadAddon(fitAddon.value);
 
-  // Mount terminal
   if (terminalContainer.value) {
     terminal.value.open(terminalContainer.value);
     fitAddon.value.fit();
-
-    // Welcome message
     terminal.value.writeln('Terminal initialized...');
     terminal.value.writeln('$ ');
-
-    // Handle terminal input
-    let currentLine = '';
-    terminal.value.onData(data => {
-      switch (data) {
-        case '\r': // Enter
-          terminal.value.writeln('');
-          if (currentLine.trim().length > 0) {
-            handleCommand(currentLine.trim());
-          }
-          currentLine = '';
-          terminal.value.write('$ ');
-          break;
-        case '\u007F': // Backspace
-          if (currentLine.length > 0) {
-            currentLine = currentLine.slice(0, -1);
-            terminal.value.write('\b \b');
-          }
-          break;
-        default:
-          currentLine += data;
-          terminal.value.write(data);
-      }
-    });
   }
 
-  // Handle terminal resize
+  editor.value = new EditorView({
+    doc: codeContent.value,
+    extensions: [
+      basicSetup,
+      javascript(),
+      oneDark,
+      EditorView.updateListener.of(update => {
+        if (update.docChanged) {
+          codeContent.value = update.state.doc.toString();
+        }
+      }),
+      EditorView.theme({
+        '&': { height: '100%' },
+        '.cm-scroller': { overflow: 'auto' },
+        '&.cm-focused': { outline: 'none' }
+      })
+    ],
+    parent: codeMirrorContainer.value
+  });
+
+  fetchFileDetails();
+
   const resizeObserver = new ResizeObserver(() => {
     if (terminal.value && fitAddon.value) {
       fitAddon.value.fit();
@@ -135,47 +164,25 @@ onMounted(() => {
     resizeObserver.observe(terminalContainer.value);
   }
 
-  // Handle window resize
   window.addEventListener('resize', handleResize);
 });
 
-// Cleanup
 onUnmounted(() => {
   if (terminal.value) {
     terminal.value.dispose();
   }
+  if (editor.value) {
+    editor.value.destroy();
+  }
   window.removeEventListener('resize', handleResize);
 });
 
-// Handle window resize
 const handleResize = () => {
   if (fitAddon.value) {
     fitAddon.value.fit();
   }
 };
 
-// Handle terminal commands
-const handleCommand = (command) => {
-  switch (command.toLowerCase()) {
-    case 'clear':
-      terminal.value.clear();
-      break;
-    case 'help':
-      terminal.value.writeln('Available commands:');
-      terminal.value.writeln('- clear: Clear the terminal');
-      terminal.value.writeln('- help: Show this help message');
-      terminal.value.writeln('- run: Run the code in editor');
-      break;
-    case 'run':
-      terminal.value.writeln('Running code...');
-      terminal.value.writeln(codeContent.value);
-      break;
-    default:
-      terminal.value.writeln(`Command not found: ${command}`);
-  }
-};
-
-// Resize handling
 const startResize = (e) => {
   e.preventDefault();
   const startX = e.clientX;
@@ -201,7 +208,6 @@ const startResize = (e) => {
     codeEditorWidth.value = newEditorWidth;
     consoleWidth.value = newConsoleWidth;
 
-    // Fit terminal after resize
     if (fitAddon.value) {
       setTimeout(() => fitAddon.value.fit(), 0);
     }
@@ -216,13 +222,47 @@ const startResize = (e) => {
   document.addEventListener('mouseup', onMouseUp);
 };
 
-// Function to update the code content
-const updateCode = () => {
-  // You can add more functionality here
-  // if (terminal.value) {
-  //   terminal.value.writeln('Code updated...');
-  // }
+// Save code function (PATCH request)
+const saveCode = async () => {
+    try {
+        const code = editor.value.state.doc.toString();
+        const uuid = route.params.uuid;
+
+        // Encode parameters properly
+        const encodedCode = encodeURIComponent(code);
+        const encodedUuid = encodeURIComponent(uuid);
+
+        const response = await fetch(
+            `http://decode.local:8080/api/method/decode.api.updatecode?file_uuid=${encodedUuid}&code=${encodedCode}`,
+            {
+                method: 'PUT',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            }
+        );
+
+        if (!response.ok) {
+            // If the response is not successful, print status and status text
+            throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        console.log('Response Data:', data); // Log the response for debugging
+
+        if (data.message.status === 'success') {
+            alert('Code saved successfully!');
+        } else {
+            alert(`${data.message.status}`);
+        }
+    } catch (error) {
+        console.error('Error saving code:', error);
+        alert(`An error occurred while saving the code: ${error.message}`);
+    }
 };
+
 </script>
 
 <style scoped>
@@ -264,4 +304,20 @@ const updateCode = () => {
 :deep(.xterm-viewport::-webkit-scrollbar-thumb:hover) {
   background: #444;
 }
+
+.cm-editor {
+  height: 100%;
+}
+
+.cm-scroller {
+  overflow: auto;
+}
+
+.cm-editor .cm-content {
+  font-family: monospace;
+  font-size: 30%;
+}
 </style>
+
+
+<!-- sudo sysctl net.ipv6.conf.all.disable_ipv6=1----solved the issue related to npm install monaco-editor -->

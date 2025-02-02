@@ -1,0 +1,44 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "UUID",
+ "creation": "2025-01-26 11:23:19.649349",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "filename",
+  "language",
+  "code"
+ ],
+ "fields": [
+  {
+   "fieldname": "filename",
+   "fieldtype": "Data",
+   "label": "fileName"
+  },
+  {
+   "fieldname": "code",
+   "fieldtype": "Code",
+   "label": "code"
+  },
+  {
+   "fieldname": "language",
+   "fieldtype": "Data",
+   "label": "language"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-01-30 22:56:19.728565",
+ "modified_by": "Administrator",
+ "module": "decode",
+ "name": "codingFiles",
+ "naming_rule": "UUID",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

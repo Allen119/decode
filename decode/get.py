@@ -12,3 +12,4 @@ def get_all_user_registrations():
 
     # Return the list of all user registrations
     return {"users": user_docs}
+

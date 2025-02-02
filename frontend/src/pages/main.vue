@@ -135,95 +135,76 @@
 
 
     <!-- Main Content Area -->
-  <div 
-    class="absolute shadow-lg flex flex-col justify-center items-center transition-all duration-100"
-    :class="{ 'blur-sm': showContainer }"
-    :style="{
-      width: '82.58%',
-      height: '100vh',
-      top: '7%',
-      left: '17.42%',
-      background: 'rgba(217, 217, 217, 1)'
-    }"
-  >
-    <img 
-      src="@/assets/images/createjoin.svg" 
-      alt="Centered Image"
-      class="object-contain cursor-pointer hover:opacity-80" 
-      :style="{
-        maxWidth: '80%',
-        maxHeight: '80%'
-      }" 
-      @click="performAction" 
-    />
-    
-    <p class="text-[20px] font-bold mt-4 mb-4 transform translate-y-[100px] translate-x-[-579%]">
-      Recent files
-    </p>
+    <div class="absolute shadow-lg flex flex-col justify-center items-center transition-all duration-100"
+      :class="{ 'blur-sm': showContainer }" :style="{
+        width: '82.58%',
+        height: '100vh',
+        top: '7%',
+        left: '17.42%',
+        background: 'rgba(217, 217, 217, 1)'
+      }">
+      <img src="@/assets/images/createjoin.svg" alt="Centered Image"
+        class="object-contain cursor-pointer hover:opacity-80" :style="{
+          maxWidth: '80%',
+          maxHeight: '80%'
+        }" @click="performAction" />
 
-    <!-- Boxes -->
-    <div 
-      v-for="(box, index) in recentbox" 
-      :key="box.id" 
-      :id="`box-${box.id}`" 
-      :data-index="index"
-      class="w-full flex items-center px-4 cursor-pointer" 
-      :style="{
-        top: '5%',
-        height: box.height,
-        width: box.width,
-        backgroundColor: box.backgroundColor || 'rgba(217, 217, 217, 0.9)',
-        transition: 'border-color 0.3s ease',
-        marginTop: box.marginTop,
-        justifyContent: 'center',
-        borderRadius: box.borderRadius,
-        border: box.border,
-        position: box.position,
-        fontSize: box.fontSize || '20px',
-        transform: box.transform
-      }" 
-      @click="handleBoxClick(box)"
-    >
-      <p class="font-light text-black mx-auto" :style="box.textStyle">
-        {{ box.name }}
+      <p class="text-[20px] font-bold mt-4 mb-4 transform translate-y-[100px] translate-x-[-579%]">
+        Recent files
       </p>
+
+      <!-- Boxes -->
+      <div v-for="(box, index) in recentbox" :key="box.id" :id="`box-${box.id}`" :data-index="index"
+        class="w-full flex items-center px-4 cursor-pointer" :style="{
+          top: '5%',
+          height: box.height,
+          width: box.width,
+          backgroundColor: box.backgroundColor || 'rgba(217, 217, 217, 0.9)',
+          transition: 'border-color 0.3s ease',
+          marginTop: box.marginTop,
+          justifyContent: 'center',
+          borderRadius: box.borderRadius,
+          border: box.border,
+          position: box.position,
+          fontSize: box.fontSize || '20px',
+          transform: box.transform
+        }" @click="handleBoxClick(box)">
+        <p class="font-light text-black mx-auto" :style="box.textStyle">
+          {{ box.name }}
+        </p>
+      </div>
+    </div>
+
+    <!-- Button to toggle container (Outside main content area) -->
+    <button @click="toggleContainer"
+      class="absolute right-12 bg-[rgba(40,41,71,1)] text-white font-bold rounded-[7px] hover:opacity-90 focus:outline-none w-36 h-12 flex items-center justify-center transform translate-y-[10px]">
+      <div class="flex items-center space-x-2">
+        <img src="@/assets/images/plus.svg" alt="Icon" class="w-6 h-6 rounded-full object-contain" />
+        <span>Create File</span>
+      </div>
+    </button>
+
+
+    <!-- New Container (Outside main content area) -->
+    <div v-if="showContainer" ref="containerRef"
+    class="absolute top-20 right-12 w-[450px] h-[80px] bg-[rgba(217,217,217,1)] rounded-md shadow-lg flex items-center justify-center z-50 transform translate-y-2">
+    <div class="flex items-center justify-center w-full space-x-4">
+      <!-- Input Box -->
+      <input 
+        type="text" 
+        v-model="fileName" 
+        placeholder="Enter file name" 
+        class="w-[300px] h-[40px] p-2 rounded-md border-2 border-gray-300" 
+      />
+
+      <!-- Save Button -->
+      <button 
+        @click="saveFile"
+        class="w-[100px] h-[40px] bg-[rgba(40,41,71,1)] text-white rounded-md hover:bg-[#797a9c]">
+        Save
+      </button>
     </div>
   </div>
-
-  <!-- Button to toggle container (Outside main content area) -->
-  <button 
-  @click="toggleContainer"
-  class="absolute right-12 bg-[rgba(40,41,71,1)] text-white font-bold rounded-[7px] hover:opacity-90 focus:outline-none w-36 h-12 flex items-center justify-center transform translate-y-[10px]"
->
-  <div class="flex items-center space-x-2">
-    <img src="@/assets/images/plus.svg" alt="Icon" class="w-6 h-6 rounded-full object-contain" />
-    <span>Create File</span>
-  </div>
-</button>
-
-
-  <!-- New Container (Outside main content area) -->
-  <div 
-  v-if="showContainer" 
-  ref="containerRef"
-  class="absolute top-20 right-12 w-[450px] h-[80px] bg-[rgba(217,217,217,1)] rounded-md shadow-lg flex items-center justify-center z-50 transform translate-y-2"
->
-  <div class="flex items-center justify-center w-full space-x-4">
-    <!-- Input Box -->
-    <input 
-      type="text" 
-      placeholder=""
-      class="w-[300px] h-[40px] p-2 rounded-md border-2 border-gray-300"
-    />
-    
-    <!-- Save Button -->
-    <button 
-      class="w-[100px] h-[40px] bg-[rgba(40,41,71,1)] text-white rounded-md hover:bg-[#797a9c]"
-    >
-      Save
-    </button>
-  </div>
-</div>
 
 
 
@@ -244,6 +225,15 @@ import documentation from '@/assets/images/documentation.svg';
 import settings from '@/assets/images/Settings.svg';
 import help from '@/assets/images/Help.svg';
 
+import { useRouter } from "vue-router";
+
+const router = useRouter(); // Initialize the router instance
+
+const navigateTo = (path) => {
+  router.push(path); // Use the router instance to navigate
+};
+
+
 // Dynamically managed boxes with custom styles
 const boxes = ref([
   {
@@ -261,21 +251,21 @@ const boxes = ref([
     logoStyle: { width: '22px', height: '22px', marginRight: '15px', transform: 'translateY(0px) translateX(40px)' },
     textStyle: { transform: 'translateX(-20px)' }
   },
-  {
-    id: 2,
-    name: 'Import from GitHub',
-    logo: gitLogo,
-    height: '5%',
-    width: '94%',
-    border: '1px solid rgba(45, 46, 79, 0.35)',
-    backgroundColor: 'rgba(255, 255, 255, 1)',
-    borderRadius: '7px',
-    position: 'relative',
-    marginTop: '20px',
-    fontSize: '20px',
-    logoStyle: { width: '40px', height: '40px', marginRight: '15px', transform: 'translateX(30px)' },
-    textStyle: { transform: 'translateX(-10px)' }
-  },
+  // {
+  //   id: 2,
+  //   name: 'Import from GitHub',
+  //   logo: gitLogo,
+  //   height: '5%',
+  //   width: '94%',
+  //   border: '1px solid rgba(45, 46, 79, 0.35)',
+  //   backgroundColor: 'rgba(255, 255, 255, 1)',
+  //   borderRadius: '7px',
+  //   position: 'relative',
+  //   marginTop: '20px',
+  //   fontSize: '20px',
+  //   logoStyle: { width: '40px', height: '40px', marginRight: '15px', transform: 'translateX(30px)' },
+  //   textStyle: { transform: 'translateX(-10px)' }
+  // },
   {
     id: 3,
     name: 'Home',
@@ -496,8 +486,10 @@ const performAction = () => {
   //alert('Action performed!');
 };
 
+const fileName = ref(""); // Holds the input file name
 const showContainer = ref(false)
 const containerRef = ref(null)
+const saveError = ref(""); // Holds error messages
 
 const toggleContainer = () => {
   showContainer.value = !showContainer.value
@@ -522,7 +514,50 @@ onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
 })
 
+const saveFile = async () => {
+  if (!fileName.value.trim()) {
+    saveError.value = "Please enter a file name.";
+    return;
+  }
 
+  // Determine the language based on the file extension
+  const language = fileName.value.endsWith(".py") ? "Python" : "Unknown";
+
+  try {
+    const response = await fetch("http://decode.local:8080/api/method/decode.api.codingFiles", {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        file_name: fileName.value,
+        language: language,
+        code: "", // Include code content if needed
+      }),
+    });
+
+    const data = await response.json();
+    console.log("Full API Response:", data);
+
+    if (data.message) {
+      alert(data.message.message); // Show success message
+      console.log("User Document:", data.message.user);
+      const lastFileUuid = data.message.user.codingfiles[data.message.user.codingfiles.length - 1].name;
+      
+      // Navigate to filecode with the UUID
+      router.push(`/filecode/${lastFileUuid}`);
+    } else {
+      saveError.value = "An unexpected error occurred.";
+    }
+  } catch (error) {
+    console.error("Save file error:", error);
+    saveError.value = "Failed to save the file. Please try again.";
+  }
+
+  // Clear the file name input
+  fileName.value = "";
+};
 </script>
 
 <style scoped>
@@ -536,3 +571,4 @@ body {
   font-family: 'Inter', sans-serif;
 }
 </style>
+

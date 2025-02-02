@@ -1,14 +1,15 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "autoincrement",
+ "autoname": "UUID",
  "creation": "2025-01-15 23:46:32.813091",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
   "fullname",
   "email",
-  "password"
+  "password",
+  "codingfiles"
  ],
  "fields": [
   {
@@ -40,18 +41,24 @@
   },
   {
    "fieldname": "password",
-   "fieldtype": "Password",
+   "fieldtype": "Data",
    "label": "Password",
    "reqd": 1
+  },
+  {
+   "fieldname": "codingfiles",
+   "fieldtype": "Table",
+   "label": "codingFiles",
+   "options": "codingFiles"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-01-15 23:52:01.840225",
+ "modified": "2025-01-30 22:54:36.162495",
  "modified_by": "Administrator",
  "module": "decode",
  "name": "user_reg",
- "naming_rule": "Autoincrement",
+ "naming_rule": "UUID",
  "owner": "Administrator",
  "permissions": [
   {
@@ -63,6 +70,20 @@
    "read": 1,
    "report": 1,
    "role": "System Manager",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Guest",
+   "select": 1,
    "share": 1,
    "write": 1
   }

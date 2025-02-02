@@ -20,7 +20,7 @@
       </p>
 
       <!-- Form Container -->
-      <form @submit.prevent="validateForm" class="p-6 space-y-6 w-full max-w-[600px] mt-16">
+      <div class="p-6 space-y-6 w-full max-w-[600px] mt-16">
         <!-- Full Name Input -->
         <div>
           <label for="full-name" class="block text-white font-medium">Full Name</label>
@@ -57,10 +57,12 @@
 
         <!-- Register Button -->
         <div>
-          <button type="submit"
-            class="w-[239px] h-[60px] bg-[#7DE5F4] text-white py-2 rounded hover:bg-[#227380] transition duration-200 transform">
+          <button @click="registerUser"
+            class="w-[239px] h-[60px] bg-[#7DE5F4] text-white py-2 rounded hover:bg-[#227380] transition duration-200 transform"
+            >
             Register
           </button>
+          <p v-if="registerError" class="text-red-500 text-sm mt-1">{{ registerError }}</p>
         </div>
 
         <!-- "Do you already have an account?" text -->
@@ -70,7 +72,7 @@
             Sign in
           </span>
         </div>
-      </form>
+      </div>
     </div>
   </div>
 </template>
@@ -85,71 +87,74 @@ const navigateTo = (path) => {
   router.push(path);
 };
 
-// Form Data
 const fullName = ref('');
 const email = ref('');
 const password = ref('');
 const confirmPassword = ref('');
 
-// Error Messages
 const emailError = ref('');
 const passwordError = ref('');
 const confirmPasswordError = ref('');
+const registerError = ref('');
 
-// Validation Logic
-const validateForm = async () => {
+const registerUser = async () => {
+  // Reset previous errors
   emailError.value = '';
   passwordError.value = '';
   confirmPasswordError.value = '';
+  registerError.value = '';
 
-  // Basic Email Validation
+  // Validation checks
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email.value)) {
     emailError.value = 'Please enter a valid email address.';
     return;
   }
 
-  // Password Validation (min 6 chars)
   if (password.value.length < 6) {
     passwordError.value = 'Password must be at least 6 characters long.';
     return;
   }
 
-  // Confirm Password Validation
   if (password.value !== confirmPassword.value) {
     confirmPasswordError.value = 'Passwords do not match.';
     return;
   }
 
-  // If no errors, proceed to backend API
+  // Send registration data to API
   try {
-    const response = await registerUser();
-    if (response.message === 'User registered successfully') {
+    const response = await fetch('http://decode.local:8080/api/method/decode.api.register_user', {
+      method: 'POST',
+      credentials: 'include', // Include cookies
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        full_name: fullName.value,
+        email: email.value,
+        password: password.value
+      })
+    });
+
+    const data = await response.json();
+
+    console.log('Full response:', {
+      status: response.status,
+      body: data
+    });
+
+    if (response.ok) {
       alert('Registration successful!');
       navigateTo('/signin');
+    } else {
+      registerError.value = data.message || 'Registration failed';
     }
   } catch (error) {
-    alert('Registration failed: ' + error.message);
+    console.error('Complete error:', error);
+    registerError.value = 'Network error. Please try again.';
   }
 };
-
-// API Call to Register User
-const registerUser = async () => {
-  const response = await fetch('http://decode.local:8080/api/method/decode.api.register_user', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      fullname: fullName.value,
-      email: email.value,
-      password: password.value,
-    }),
-  });
-  return await response.json();
-};
 </script>
-
 <style scoped>
 /* Add any custom styles here */
 </style>
