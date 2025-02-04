@@ -7,11 +7,12 @@
       <div class="flex items-center gap-4">
         <img src="@/assets/images/logo.png" alt="Logo" class="object-contain"
           :style="{ maxHeight: '80%', width: '15%', height: 'auto' }" />
-        <span class="text-lg text-black">{{ fileName }}</span>  <!-- File name displayed here -->
+        <span class="text-lg text-black">{{ fileName }}</span> <!-- File name displayed here -->
       </div>
       <!-- Action Buttons Section -->
       <div class="flex items-center gap-4">
-        <button @click="saveCode" class="bg-[rgba(40,41,71,1)] text-white px-4 py-2 rounded hover:bg-[#797a9c] transition">Save</button>
+        <button @click="saveCode"
+          class="bg-[rgba(40,41,71,1)] text-white px-4 py-2 rounded hover:bg-[#797a9c] transition">Save</button>
         <button class="bg-[rgba(40,41,71,1)] text-white px-4 py-2 rounded hover:bg-[#797a9c] transition">Share</button>
       </div>
     </header>
@@ -49,11 +50,15 @@ import '@xterm/xterm/css/xterm.css';
 import { EditorView, basicSetup } from 'codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { oneDark } from '@codemirror/theme-one-dark';
+import { keymap } from '@codemirror/view';
+import { indentWithTab } from '@codemirror/commands';
+
 
 const route = useRoute();
 const codeMirrorContainer = ref(null);
 const editor = ref(null);
 const fileName = ref(""); // Store filename
+const currentInput = ref('');
 
 // Constants for minimum widths
 const MIN_EDITOR_WIDTH = 400;
@@ -64,11 +69,15 @@ const terminalContainer = ref(null);
 const terminal = ref(null);
 const fitAddon = ref(null);
 
+const commandHistory = ref([]);
+const historyIndex = ref(-1);
+
 // Reactive state
 const codeContent = ref('');
 const codeEditorWidth = ref(0);
 const consoleWidth = ref(0);
 
+// Fetch file details from the backend
 const fetchFileDetails = async () => {
   try {
     const uuid = route.params.uuid;
@@ -101,11 +110,123 @@ const fetchFileDetails = async () => {
   }
 };
 
+// Handle terminal input
+const handleTerminalInput = (data) => {
+  const char = data;
+
+  if (char === '\x7F' || char === '\b') { // Backspace
+    if (currentInput.value.length > 0) {
+      currentInput.value = currentInput.value.slice(0, -1);
+      terminal.value.write('\b \b');
+    }
+  } 
+  else if (char === '\r') { // Enter
+    terminal.value.writeln('');
+    if (currentInput.value.trim() !== '') {
+      commandHistory.value.unshift(currentInput.value.trim()); // Store command in history
+      historyIndex.value = -1; // Reset history navigation
+    }
+    handleCommand(currentInput.value);
+    currentInput.value = '';
+    terminal.value.write('$ ');
+  }
+  else if (char === '\x1b[A') { // Up arrow
+    if (historyIndex.value < commandHistory.value.length - 1) {
+      historyIndex.value++;
+      updateTerminalInput(commandHistory.value[historyIndex.value]);
+    }
+  }
+  else if (char === '\x1b[B') { // Down arrow
+    if (historyIndex.value > -1) {
+      historyIndex.value--;
+      updateTerminalInput(historyIndex.value === -1 ? '' : commandHistory.value[historyIndex.value]);
+    }
+  }
+  else { // Regular characters
+    terminal.value.write(char);
+    currentInput.value += char;
+  }
+};
+
+const handleCommand = (command) => {
+  switch (command.trim()) {
+    case 'clear':
+      clearTerminal();
+      break;
+    case 'help':
+      terminal.value.writeln('Available commands:');
+      terminal.value.writeln('  clear - Clear terminal');
+      terminal.value.writeln(`  python ${fileName.value} - Run Python code`);
+      terminal.value.writeln('  help - Show this help message');
+      break;
+    case `python ${fileName.value}`:
+      executePythonCode(editor.value.state.doc.toString());
+      break;
+    default:
+      terminal.value.writeln(`Command not found: ${command}`);
+      break;
+  }
+};
+
+const updateTerminalInput = (newInput) => {
+  // Clear current line
+  while (currentInput.value.length > 0) {
+    terminal.value.write('\b \b');
+    currentInput.value = currentInput.value.slice(0, -1);
+  }
+  // Write new input
+  currentInput.value = newInput;
+  terminal.value.write(currentInput.value);
+};
+
+const clearTerminal = () => {
+  terminal.value.clear();
+  terminal.value.write('$ ');
+  currentInput.value = '';
+};
+
+
+
+// Execute Python code on the backend
+const executePythonCode = async (code) => {
+  try {
+    const response = await fetch('http://decode.local:8080/api/method/decode.api.execute', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ code }),
+    });
+
+    const data = await response.json();
+    console.log("API Response:", data); // Debugging API Response
+
+    // Print the output if available
+    if (data.message && data.message.output) {
+      data.message.output.split("\n").forEach(line => terminal.value.writeln(line));
+    }
+
+    // Print the error properly if available
+    if (data.message && data.message.error) {
+      terminal.value.writeln("Error:");
+      data.message.error.split("\n").forEach(line => terminal.value.writeln(line));
+    }
+
+  } catch (error) {
+    console.error("API Call Failed:", error);
+    terminal.value.writeln(`Error executing Python code: ${error.message}`);
+  }
+};
+
+
+
 onMounted(() => {
   const totalWidth = window.innerWidth;
   codeEditorWidth.value = Math.floor(totalWidth * 0.7);
   consoleWidth.value = totalWidth - codeEditorWidth.value - 8;
 
+  // Initialize the terminal
   terminal.value = new Terminal({
     theme: {
       background: '#000000',
@@ -122,6 +243,7 @@ onMounted(() => {
     allowTransparency: true
   });
 
+
   fitAddon.value = new FitAddon();
   terminal.value.loadAddon(fitAddon.value);
 
@@ -132,6 +254,7 @@ onMounted(() => {
     terminal.value.writeln('$ ');
   }
 
+  // Initialize the CodeMirror editor
   editor.value = new EditorView({
     doc: codeContent.value,
     extensions: [
@@ -147,13 +270,19 @@ onMounted(() => {
         '&': { height: '100%' },
         '.cm-scroller': { overflow: 'auto' },
         '&.cm-focused': { outline: 'none' }
-      })
+      }),
     ],
     parent: codeMirrorContainer.value
   });
 
+  // Fetch file details when the component is mounted
   fetchFileDetails();
 
+  // Add terminal input event listener
+  terminal.value.onData((data) => {
+    handleTerminalInput(data);
+  });
+  // Handle window resizing
   const resizeObserver = new ResizeObserver(() => {
     if (terminal.value && fitAddon.value) {
       fitAddon.value.fit();
@@ -177,12 +306,14 @@ onUnmounted(() => {
   window.removeEventListener('resize', handleResize);
 });
 
+// Handle window resize
 const handleResize = () => {
   if (fitAddon.value) {
     fitAddon.value.fit();
   }
 };
 
+// Handle resizing of the editor and console
 const startResize = (e) => {
   e.preventDefault();
   const startX = e.clientX;
@@ -224,47 +355,45 @@ const startResize = (e) => {
 
 // Save code function (PATCH request)
 const saveCode = async () => {
-    try {
-        const code = editor.value.state.doc.toString();
-        const uuid = route.params.uuid;
+  try {
+    const code = editor.value.state.doc.toString();
+    const uuid = route.params.uuid;
 
-        // Encode parameters properly
-        const encodedCode = encodeURIComponent(code);
-        const encodedUuid = encodeURIComponent(uuid);
+    // Encode parameters properly
+    const encodedCode = encodeURIComponent(code);
+    const encodedUuid = encodeURIComponent(uuid);
 
-        const response = await fetch(
-            `http://decode.local:8080/api/method/decode.api.updatecode?file_uuid=${encodedUuid}&code=${encodedCode}`,
-            {
-                method: 'PUT',
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            }
-        );
+    const response = await fetch(
+      `http://decode.local:8080/api/method/decode.api.updatecode?file_uuid=${encodedUuid}&code=${encodedCode}`,
+      {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
 
-        if (!response.ok) {
-            // If the response is not successful, print status and status text
-            throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
-        }
-
-        const data = await response.json();
-
-        console.log('Response Data:', data); // Log the response for debugging
-
-        if (data.message.status === 'success') {
-            alert('Code saved successfully!');
-        } else {
-            alert(`${data.message.status}`);
-        }
-    } catch (error) {
-        console.error('Error saving code:', error);
-        alert(`An error occurred while saving the code: ${error.message}`);
+    if (!response.ok) {
+      // If the response is not successful, print status and status text
+      throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
     }
+
+    const data = await response.json();
+
+    console.log('Response Data:', data); // Log the response for debugging
+
+    if (data.message.status === 'success') {
+      alert('Code saved successfully!');
+    } else {
+      alert(`${data.message.status}`);
+    }
+  } catch (error) {
+    console.error('Error saving code:', error);
+    alert(`An error occurred while saving the code: ${error.message}`);
+  }
 };
-
 </script>
-
 <style scoped>
 /* Prevent text selection during resize */
 .cursor-ew-resize {

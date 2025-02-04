@@ -224,3 +224,35 @@ def updatecode(file_uuid, code):
             "status": "error",
             "message": f"An error occurred: {str(e)}"
         }
+        
+import subprocess
+import frappe
+
+@frappe.whitelist(allow_guest=True)
+def execute(code):
+    try:
+        frappe.logger().info(f"Executing Code:\n{code}")
+
+        result = subprocess.run(
+            ["python3", "-c", code],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+
+        output = result.stdout
+        error = result.stderr
+
+        frappe.logger().info(f"Execution Output:\n{output}")
+        frappe.logger().info(f"Execution Error:\n{error}")
+
+        return {"output": output, "error": error}
+
+    except subprocess.TimeoutExpired:
+        frappe.logger().error("Execution timed out.")
+        return {"error": "Execution timed out."}
+    except Exception as e:
+        frappe.logger().error(f"Execution failed: {str(e)}")
+        return {"error": str(e)}
+
+

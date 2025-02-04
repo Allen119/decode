@@ -1,49 +1,24 @@
 <template>
   <div id="app">
     <!-- Left Sidebar -->
-    <div class="absolute shadow-lg flex flex-col justify-start items-center" :style="{
-      width: '16.8%', /* Sidebar width */
-      height: '100vh', /* Full height of the viewport */
-      top: '0',
-      left: '0',
-      background: 'rgba(217, 106, 106, 1)'
-    }">
+    <div class="absolute shadow-lg flex flex-col justify-start items-center w-[16.8%] h-screen top-0 left-0 bg-[#d96a6a]">
 
       <!-- Inner Box at Top of Sidebar -->
-      <div class="w-full flex items-center px-4 hover:border-2" :style="{
-        height: '7%',
-        backgroundColor: 'rgba(217, 217, 217, 1)',
-        borderColor: 'rgba(45, 46, 79, 0.35)',
-        transition: 'border-color 0.3s ease',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        alignItems: 'center',
-      }">
+      <div class="w-full flex items-center px-4 h-[7%] bg-[#d9d9d9] border-[#2d2e4f]/35 transition-colors duration-300 ease-in-out flex-col justify-center">
+
         <!-- Image -->
-        <img src="@/assets/images/Ellipse1.png" alt="Left Image" :style="{
-          width: '30px',
-          height: '30px',
-          transform: 'translateX(-80px) translateY(15px)'
-        }" />
+        <img src="@/assets/images/Ellipse1.png" alt="Left Image" class="w-[30px] h-[30px] -translate-x-[80px] translate-y-[15px]" />
+
         <!-- Centered Paragraph -->
-        <p class="text-[20px] font-light text-black" :style="{
-          transform: 'translateY(-15px)'
-        }">
-          PKD21IT009
-        </p>
+        <p class="text-[20px] font-light text-black translate-y-[-15px]">
+  PKD21IT009
+</p>
+
       </div>
 
       <!-- Customizable Boxes -->
-      <div
-        class="absolute shadow-lg flex flex-col justify-start items-center overflow-y-auto scrollbar scrollbar-thumb-gray-400 scrollbar-track-gray-200"
-        :style="{
-          width: '100%', /* Sidebar width */
-          height: '100%', /* Full height of the viewport */
-          top: '7%',
-          left: '0',
-          background: 'rgba(255, 255, 255, 1)'
-        }">
+      <div class="absolute shadow-lg flex flex-col justify-start items-center overflow-y-auto w-full h-full top-[7%] left-0 bg-white scrollbar scrollbar-thumb-gray-400 scrollbar-track-gray-200">
+
         <!-- Boxes -->
         <div v-for="(box, index) in boxes" :key="box.id" :id="`box-${box.id}`" :data-index="index"
           class="w-full flex items-center px-4 cursor-pointer" :style="{
@@ -104,54 +79,28 @@
 
 
     <!-- Top Bar -->
-    <div class="absolute shadow-lg flex flex-col justify-center items-center" :style="{
-      width: '82.58%',
-      height: '7%',
-      top: '0',
-      left: '17.42%',
-      background: 'rgba(217, 217, 217, 1)',
-    }">
+    <div class="absolute shadow-lg flex flex-col justify-center items-center w-[82.58%] h-[7%] top-0 left-[17.42%] bg-[#d9d9d9]">
+
       <!-- Logo -->
-      <img src="@/assets/images/logo.png" alt="Vertically Centered Image" class="object-contain" :style="{
-        maxHeight: '80%',
-        position: 'absolute',
-        top: '50%',
-        left: '80px',
-        transform: 'translateY(-50%)',
-      }" />
+      <img src="@/assets/images/logo.png" alt="Vertically Centered Image" class="object-contain max-h-[80%] absolute top-1/2 left-[80px] -translate-y-1/2" />
+
 
       <!-- Form Input Box -->
       <input type="text" placeholder="Search File & Courses"
-        class="border border-gray-300 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[rgba(217,217,217,1)] text-[rgba(217,217,217,1)] text-center"
-        :style="{
-          width: '60%', /* Adjust width */
-          height: '58%', /* Adjust height */
-          textAlign: 'center', /* Horizontally center placeholder text */
-          lineHeight: '2.5', /* Vertically center placeholder text (match it to input height if needed) */
-        }" />
+  class="border border-gray-300 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#d9d9d9] text-[#d9d9d9] text-center w-[60%] h-[58%] leading-[2.5]" />
+
     </div>
 
 
 
 
     <!-- Main Content Area -->
-    <div class="absolute shadow-lg flex flex-col justify-center items-center transition-all duration-100"
-      :class="{ 'blur-sm': showContainer }" :style="{
-        width: '82.58%',
-        height: '100vh',
-        top: '7%',
-        left: '17.42%',
-        background: 'rgba(217, 217, 217, 1)'
-      }">
-      <img src="@/assets/images/createjoin.svg" alt="Centered Image"
-        class="object-contain cursor-pointer hover:opacity-80" :style="{
-          maxWidth: '80%',
-          maxHeight: '80%'
-        }" @click="performAction" />
+    <div class="absolute shadow-lg flex flex-col justify-center items-center transition-all duration-100 w-[82.58%] h-screen top-[7%] left-[17.42%] bg-[#d9d9d9]" :class="{ 'blur-sm': showContainer }">
+  <img src="@/assets/images/createjoin.svg" alt="Centered Image" class="object-contain cursor-pointer hover:opacity-80 max-w-[80%] max-h-[80%]" @click="performAction" />
 
-      <p class="text-[20px] font-bold mt-4 mb-4 transform translate-y-[100px] translate-x-[-579%]">
-        Recent files
-      </p>
+  <p class="text-[20px] font-bold mt-4 mb-4 transform translate-y-[100px] translate-x-[-579%]">
+    Recent files
+  </p>
 
       <!-- Boxes -->
       <div v-for="(box, index) in recentbox" :key="box.id" :id="`box-${box.id}`" :data-index="index"
@@ -571,4 +520,3 @@ body {
   font-family: 'Inter', sans-serif;
 }
 </style>
-
