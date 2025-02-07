@@ -13,7 +13,8 @@
       <div class="flex items-center gap-4">
         <button @click="saveCode"
           class="bg-[rgba(40,41,71,1)] text-white px-4 py-2 rounded hover:bg-[#797a9c] transition">Save</button>
-        <button class="bg-[rgba(40,41,71,1)] text-white px-4 py-2 rounded hover:bg-[#797a9c] transition">Share</button>
+        <button @click="shareCode" 
+        class="bg-[rgba(40,41,71,1)] text-white px-4 py-2 rounded hover:bg-[#797a9c] transition">Share</button>
       </div>
     </header>
 
@@ -109,6 +110,8 @@ const fetchFileDetails = async () => {
     }
   }
 };
+
+
 
 // Handle terminal input
 const handleTerminalInput = (data) => {
@@ -393,6 +396,16 @@ const saveCode = async () => {
     alert(`An error occurred while saving the code: ${error.message}`);
   }
 };
+
+const shareCode = () => {
+  try {
+    const uuid = route.params.uuid;
+    const encodedUuid = encodeURIComponent(uuid);
+    alert(`UUID: ${encodedUuid}`);
+  } catch (error) {
+    console.error("Error encoding UUID:", error);
+  }
+};
 </script>
 <style scoped>
 /* Prevent text selection during resize */
@@ -450,3 +463,6 @@ const saveCode = async () => {
 
 
 <!-- sudo sysctl net.ipv6.conf.all.disable_ipv6=1----solved the issue related to npm install monaco-editor -->
+
+
+
