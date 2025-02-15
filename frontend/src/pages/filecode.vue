@@ -406,6 +406,7 @@ const shareCode = () => {
     console.error("Error encoding UUID:", error);
   }
 };
+
 </script>
 <style scoped>
 /* Prevent text selection during resize */

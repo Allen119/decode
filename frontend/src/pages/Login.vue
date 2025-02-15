@@ -23,7 +23,6 @@
     </Card>
   </div>
 </template>
-
 <script lang="ts" setup>
 import { session } from '../data/session'
 

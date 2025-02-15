@@ -117,40 +117,42 @@ def codingFiles(file_name, code, language):
 
 @frappe.whitelist(allow_guest=True)
 def getfiles(search_uuid):
-    global x
-    try:
+    try:        
+        # Step 1: Get all users
+        all_users = frappe.get_all("user_reg", fields=["name"])
+        users_with_coding_files = []  # List to store user names who have coding files
         
-        user_id = "0194adcf-15b7-7d81-a641-fc497681d666"
-        # Fetch the user document using the provided user_id (UUID)
-        user = frappe.get_doc("user_reg", user_id)
+        # Step 2: Loop through all users and check if they have coding files
+        for user in all_users:
+            user_doc = frappe.get_doc("user_reg", user.name)  # Fetch full user document
+            
+            if user_doc.codingfiles:  # Check if codingfiles table has entries
+                users_with_coding_files.append(user.name)  # Store only user name
+        
+        # Step 3: Loop through the users with coding files and search for the file
+        for user_name in users_with_coding_files:
+            user_doc = frappe.get_doc("user_reg", user_name)  # Fetch full user document
 
-        # Check if the user has files in the 'codingfiles' child table
-        if not user.codingfiles:
-            return {
-                "message": f"No files found for user {user_id}.",
-                "file": None
-            }
-
-        # Search for the file by UUID in the user's 'codingfiles' child table
-        for file_entry in user.codingfiles:
-            if file_entry.name == search_uuid:
-                # File found, return its details
-                return {
-                    "message": f"File with UUID {search_uuid} found",
-                    "file": {
-                        "filename": file_entry.filename,
-                        "language": file_entry.language,
-                        "code": file_entry.code,
-                        "uuid": file_entry.name,
-                        "creation": file_entry.creation,
-                        "modified": file_entry.modified,
-                        "owner": file_entry.owner
+            # Step 4: Search for the file by UUID in the user's 'codingfiles' child table
+            for file_entry in user_doc.codingfiles:
+                if file_entry.name == search_uuid:
+                    # File found, return its details
+                    return {
+                        "message": f"File with UUID {search_uuid} found for user {user_name}",
+                        "file": {
+                            "filename": file_entry.filename,
+                            "language": file_entry.language,
+                            "code": file_entry.code,
+                            "uuid": file_entry.name,
+                            "creation": file_entry.creation,
+                            "modified": file_entry.modified,
+                            "owner": file_entry.owner
+                        }
                     }
-                }
 
-        # If no file was found for this user
+        # If no file was found for any user
         return {
-            "message": f"File with UUID {search_uuid} not found for user {user_id}.",
+            "message": f"File with UUID {search_uuid} not found for any user.",
             "file": None
         }
 
@@ -168,10 +170,11 @@ def getfiles(search_uuid):
         }
 
 @frappe.whitelist(allow_guest=True)
-def updatecode(file_uuid, code):
+def updateCode(file_uuid, code):
+    global x
     try:
         frappe.logger().info(f"Guest user attempting to update file: {file_uuid}")
-        user_id = "0194adcf-15b7-7d81-a641-fc497681d666"  # Example user ID
+        user_id = x  # Example user ID
         
         # Sanitize and validate inputs
         if not file_uuid or not code:
@@ -226,8 +229,6 @@ def updatecode(file_uuid, code):
         }
         
 import subprocess
-import frappe
-
 @frappe.whitelist(allow_guest=True)
 def execute(code):
     try:
@@ -254,5 +255,96 @@ def execute(code):
     except Exception as e:
         frappe.logger().error(f"Execution failed: {str(e)}")
         return {"error": str(e)}
+    
+    
 
+@frappe.whitelist(allow_guest=True)
+def findbyuuid(uuid):
+    # Get all user_reg documents
+    all_users = frappe.get_all("user_reg", fields=["name"])
 
+    # Loop through each user and check their codingfiles
+    for user in all_users:
+        # Fetch the user document
+        user_doc = frappe.get_doc("user_reg", user.name)
+        
+        # Check if the user has any codingfiles in the child table
+        if user_doc.codingfiles:
+            # Loop through each coding file and check if the file matches the given UUID
+            for codingfile in user_doc.codingfiles:
+                if codingfile.name == uuid:  # Compare with the provided uuid
+                    # Return the found file details as a dictionary
+                    return uuid# This will return the file details codingfile.as_dict()
+    # If file is not found, return a message
+    return _(False)
+
+from frappe.realtime import publish_realtime
+@frappe.whitelist(allow_guest=True)
+def updatecode(file_uuid, code):
+    global x
+    try:
+        frappe.logger().info(f"Guest user attempting to update file: {file_uuid}")
+        user_id = x # Example user ID
+        
+        # Sanitize and validate inputs
+        if not file_uuid or not code:
+            return {
+                "status": "error",
+                "message": "File UUID and code are required"
+            }
+            
+        user = frappe.get_doc("user_reg", user_id)
+        frappe.logger().info(f"User document fetched: {user.name}")
+        
+        file_entry = None
+        for entry in user.codingfiles:
+            if entry.name == file_uuid:
+                file_entry = entry
+                break
+                
+        if file_entry:
+            frappe.logger().info(f"File found: {file_uuid}")
+            file_entry.code = code
+            user.save()
+            frappe.logger().info(f"File updated successfully: {file_uuid}")
+            
+            # Prepare response data
+            file_data = {
+                "filename": file_entry.filename,
+                "language": file_entry.language,
+                "code": file_entry.code,
+                "uuid": file_entry.name,
+                "creation": str(file_entry.creation),
+                "modified": str(file_entry.modified),
+                "owner": file_entry.owner
+            }
+            
+            # Broadcast the update via socket
+            publish_realtime(
+                event="fileUpdated",
+                message=file_data,
+                room=None,  # Broadcasts to all users
+                user=None,  # Broadcasts to all users
+                after_commit=True
+            )
+            
+            response = {
+                "status": "success",
+                "message": "File updated successfully",
+                "file": file_data
+            }
+            return response
+            
+        else:
+            frappe.logger().error(f"File not found: {file_uuid}")
+            return {
+                "status": "error",
+                "message": f"File with UUID {file_uuid} not found"
+            }
+            
+    except Exception as e:
+        frappe.logger().error(f"Error in updatecode: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"An error occurred: {str(e)}"
+        }

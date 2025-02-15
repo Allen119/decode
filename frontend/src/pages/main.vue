@@ -102,6 +102,27 @@
     Recent files
   </p>
 
+  <div v-if="visibleContainers[7]" 
+      class="new-container absolute top-20 left-15 w-[450px] h-[80px] bg-[rgba(217,217,217,1)] rounded-md shadow-lg flex items-center justify-center z-50 transform translate-y-[300%]">
+      <div class="flex items-center justify-center w-full space-x-4">
+      <!-- Input Box -->
+      <input 
+        type="text" 
+        v-model="lastFileUuid"
+        placeholder="Enter UUID" 
+        class="w-[300px] h-[40px] p-2 rounded-md border-2 border-gray-300" 
+      />
+
+      <!-- Save Button -->
+      <button 
+        class="w-[100px] h-[40px] bg-[rgba(40,41,71,1)] text-white rounded-md hover:bg-[#797a9c]"
+        @click="enterfile">
+        Enter
+      </button>
+      <p v-if="errorMessage" class="text-red-500">{{ errorMessage }}</p>
+    </div>
+ </div>
+
       <!-- Boxes -->
       <div v-for="(box, index) in recentbox" :key="box.id" :id="`box-${box.id}`" :data-index="index"
         class="w-full flex items-center px-4 cursor-pointer" :style="{
@@ -157,7 +178,6 @@
 
 
 
-
   </div>
 </template>
 
@@ -183,6 +203,7 @@ const navigateTo = (path) => {
 };
 
 
+
 // Dynamically managed boxes with custom styles
 const boxes = ref([
   {
@@ -200,21 +221,6 @@ const boxes = ref([
     logoStyle: { width: '22px', height: '22px', marginRight: '15px', transform: 'translateY(0px) translateX(40px)' },
     textStyle: { transform: 'translateX(-20px)' }
   },
-  // {
-  //   id: 2,
-  //   name: 'Import from GitHub',
-  //   logo: gitLogo,
-  //   height: '5%',
-  //   width: '94%',
-  //   border: '1px solid rgba(45, 46, 79, 0.35)',
-  //   backgroundColor: 'rgba(255, 255, 255, 1)',
-  //   borderRadius: '7px',
-  //   position: 'relative',
-  //   marginTop: '20px',
-  //   fontSize: '20px',
-  //   logoStyle: { width: '40px', height: '40px', marginRight: '15px', transform: 'translateX(30px)' },
-  //   textStyle: { transform: 'translateX(-10px)' }
-  // },
   {
     id: 3,
     name: 'Home',
@@ -278,7 +284,7 @@ const boxes = ref([
   },
   {
     id: 7,
-    name: 'Profile',
+    name: 'UUID',
     logo: profile,
     height: '4%',
     width: '37%',
@@ -408,27 +414,8 @@ const recentbox = ref([
     transform: 'translateX(-55px) translateY(30px)',
     textStyle: { transform: 'translateX(-570px)' }
   },
-  // {
-  //   id: 5,
-  //   name: 'Help',
-  //   logo: help,
-  //   height: '4%',
-  //   width: '37%',
-  //   backgroundColor: 'rgba(255, 255, 255, 1)',
-  //   borderRadius: '7px',
-  //   position: 'relative',
-  //   marginTop: '24px',
-  //   fontSize: '20px',
-  //   transform: 'translateX(-93px)',
-  //   logoStyle: { width: '30px', height: '30px', marginRight: '15px', transform: 'translateX(-5.5px) translateY(0px)' },
-  //   textStyle: { transform: 'translateX(-15px)' }
-  // },
 ]);
 
-function handleBoxClick(box) {
-  console.log('Box clicked:', box);
-  // Add your custom logic here, e.g., navigation, modal, etc.
-}
 const performAction = () => {
   console.log('Clicked');
   // Add your custom logic here, e.g., navigating to a new route or triggering a modal
@@ -507,6 +494,56 @@ const saveFile = async () => {
   // Clear the file name input
   fileName.value = "";
 };
+const visibleContainers = ref({})
+
+const handleBoxClick = (box) => {
+ if (box.id === 7) {
+   // Toggle container visibility
+   visibleContainers.value[box.id] = !visibleContainers.value[box.id]
+ }
+}
+
+
+const lastFileUuid = ref(""); // Store UUID from input
+const errorMessage = ref(""); // Store error message
+
+
+const enterfile = async () => {
+  errorMessage.value = ""; // Reset error message
+
+  if (!lastFileUuid.value.trim()) {
+    errorMessage.value = "Please enter a valid UUID";
+    return;
+  }
+
+  console.log("Sending UUID:", lastFileUuid.value); // ✅ Debugging
+
+  try {
+    const response = await fetch(
+      `http://decode.local:8080/api/method/decode.api.findbyuuid?uuid=${encodeURIComponent(lastFileUuid.value)}`
+    );
+
+    console.log("Response status:", response.status); // ✅ Debugging
+
+    if (!response.ok) {
+      throw new Error("Server error. Please try again later.");
+    }
+
+    const result = await response.json();
+    console.log("API Response:", result); // ✅ Debugging
+
+    if (result.message) {
+      router.push(`/filecode/${result.message}`);
+    } else {
+      errorMessage.value = "Invalid UUID. Please enter a valid one.";
+    }
+  } catch (error) {
+    console.error("Fetch Error:", error);
+    errorMessage.value = "Network error. Check your connection.";
+  }
+};
+
+
 </script>
 
 <style scoped>
