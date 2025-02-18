@@ -34,6 +34,12 @@ const routes = [
     component: () => import('@/pages/filecode.vue'),
     props: true  // Enable props for route params
   },
+
+  {
+    name: 'filee',
+    path: '/filee',
+    component: () => import('@/pages/filee.vue'),
+  },
 ]
 
 let router = createRouter({

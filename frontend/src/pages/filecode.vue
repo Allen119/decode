@@ -91,6 +91,13 @@ const fetchFileDetails = async () => {
     });
 
     const data = await response.json();
+    console.log("API Response:", data);
+
+    if (data.message.message === "You should log in first.") {
+      alert("Login please!!");
+      return;
+    }
+
     if (data.message && data.message.file) {
       fileName.value = data.message.file.filename;
       if (editor.value) {
@@ -102,6 +109,8 @@ const fetchFileDetails = async () => {
           }
         });
       }
+    } else {
+      alert(data.message); // Alert the message if file is not found
     }
   } catch (error) {
     console.error("Error fetching file details:", error);
@@ -464,6 +473,3 @@ const shareCode = () => {
 
 
 <!-- sudo sysctl net.ipv6.conf.all.disable_ipv6=1----solved the issue related to npm install monaco-editor -->
-
-
-

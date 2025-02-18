@@ -117,7 +117,11 @@ def codingFiles(file_name, code, language):
 
 @frappe.whitelist(allow_guest=True)
 def getfiles(search_uuid):
-    try:        
+    global x
+    if x is None:
+        return {"message": "You should log in first.", "file": None}
+
+    try:       
         # Step 1: Get all users
         all_users = frappe.get_all("user_reg", fields=["name"])
         users_with_coding_files = []  # List to store user names who have coding files
@@ -158,7 +162,7 @@ def getfiles(search_uuid):
 
     except frappe.DoesNotExistError:
         return {
-            "message": f"Error: User with UUID {user_id} does not exist.",
+            "message": f"Error: User with UUID does not exist.",
             "file": None
         }
     except Exception as e:
@@ -278,21 +282,36 @@ def findbyuuid(uuid):
     # If file is not found, return a message
     return _(False)
 
-from frappe.realtime import publish_realtime
 @frappe.whitelist(allow_guest=True)
 def updatecode(file_uuid, code):
     global x
     try:
         frappe.logger().info(f"Guest user attempting to update file: {file_uuid}")
-        user_id = x # Example user ID
+        user_id = x  # Example user ID
         
+        # Emit a status update to all connected clients
+        frappe.publish_realtime(
+            'code_update_started',
+            {
+                'file_uuid': file_uuid,
+                'user_id': user_id,
+                'status': 'processing'
+            },
+            user=user_id
+        )
+
         # Sanitize and validate inputs
         if not file_uuid or not code:
-            return {
-                "status": "error",
-                "message": "File UUID and code are required"
-            }
-            
+            frappe.publish_realtime(
+                'code_update_error',
+                {
+                    'file_uuid': file_uuid,
+                    'message': "File UUID and code are required"
+                },
+                user=user_id
+            )
+            return
+
         user = frappe.get_doc("user_reg", user_id)
         frappe.logger().info(f"User document fetched: {user.name}")
         
@@ -301,7 +320,7 @@ def updatecode(file_uuid, code):
             if entry.name == file_uuid:
                 file_entry = entry
                 break
-                
+
         if file_entry:
             frappe.logger().info(f"File found: {file_uuid}")
             file_entry.code = code
@@ -309,42 +328,56 @@ def updatecode(file_uuid, code):
             frappe.logger().info(f"File updated successfully: {file_uuid}")
             
             # Prepare response data
-            file_data = {
-                "filename": file_entry.filename,
-                "language": file_entry.language,
-                "code": file_entry.code,
-                "uuid": file_entry.name,
-                "creation": str(file_entry.creation),
-                "modified": str(file_entry.modified),
-                "owner": file_entry.owner
-            }
-            
-            # Broadcast the update via socket
-            publish_realtime(
-                event="fileUpdated",
-                message=file_data,
-                room=None,  # Broadcasts to all users
-                user=None,  # Broadcasts to all users
-                after_commit=True
-            )
-            
-            response = {
+            response_data = {
                 "status": "success",
                 "message": "File updated successfully",
-                "file": file_data
+                "file": {
+                    "filename": file_entry.filename,
+                    "language": file_entry.language,
+                    "code": file_entry.code,
+                    "uuid": file_entry.name,
+                    "creation": str(file_entry.creation),
+                    "modified": str(file_entry.modified),
+                    "owner": file_entry.owner
+                }
             }
-            return response
             
+            # Emit success event with updated file data
+            frappe.publish_realtime(
+                'code_update_complete',
+                response_data,
+                user=user_id
+            )
+            
+            return response_data
         else:
             frappe.logger().error(f"File not found: {file_uuid}")
-            return {
+            error_data = {
                 "status": "error",
                 "message": f"File with UUID {file_uuid} not found"
             }
             
+            # Emit error event
+            frappe.publish_realtime(
+                'code_update_error',
+                error_data,
+                user=user_id
+            )
+            
+            return error_data
+
     except Exception as e:
         frappe.logger().error(f"Error in updatecode: {str(e)}")
-        return {
+        error_data = {
             "status": "error",
             "message": f"An error occurred: {str(e)}"
         }
+        
+        # Emit error event
+        frappe.publish_realtime(
+                'code_update_error',
+                error_data,
+                user=user_id
+        )
+        
+        return error_data
