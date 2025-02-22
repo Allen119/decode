@@ -40,6 +40,12 @@ const routes = [
     path: '/filee',
     component: () => import('@/pages/filee.vue'),
   },
+
+  {
+    name: 'likect',
+    path: '/likect',
+    component: () => import('@/pages/likect.vue'),
+  },
 ]
 
 let router = createRouter({

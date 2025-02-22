@@ -39,3 +39,46 @@ def notify_typing(room_id, is_typing):
         print(f"Error publishing realtime event: {str(e)}")  # Debug log
         return {"status": "error", "message": str(e)}
 
+import frappe
+from frappe import publish_realtime
+
+@frappe.whitelist()
+def send_like():
+    """Increment likes only for the existing LikeCounter document with name 'hey'."""
+    doc_name = "hey"  # Target the specific existing document
+
+    # Ensure the document exists
+    if not frappe.db.exists("LikeCounter", doc_name):
+        return {"status": "error", "message": f"LikeCounter '{doc_name}' does not exist."}
+
+    # Fetch and update the existing document
+    doc = frappe.get_doc("LikeCounter", doc_name)
+    doc.likes += 1
+    doc.save()
+    frappe.db.commit()
+
+    # Broadcast update
+    publish_realtime(
+        event="update_likes",
+        message={"likes": doc.likes},
+        user="all"
+    )
+
+    return {"status": "success", "likes": doc.likes}
+
+import frappe
+
+@frappe.whitelist(allow_guest=True)
+def get_likes():
+    doc_name = "hey"  # Target the specific existing document
+
+    # Ensure the document exists
+    if not frappe.db.exists("LikeCounter", doc_name):
+        return {"status": "error", "message": f"LikeCounter '{doc_name}' does not exist."}
+
+    # Fetch the document
+    doc = frappe.get_doc("LikeCounter", doc_name)
+
+    # Return the likes count
+    return {"likes": doc.likes}  # Assuming 'likes' is a field in the LikeCounter Doctype
+

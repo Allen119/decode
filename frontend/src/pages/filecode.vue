@@ -13,8 +13,8 @@
       <div class="flex items-center gap-4">
         <button @click="saveCode"
           class="bg-[rgba(40,41,71,1)] text-white px-4 py-2 rounded hover:bg-[#797a9c] transition">Save</button>
-        <button @click="shareCode" 
-        class="bg-[rgba(40,41,71,1)] text-white px-4 py-2 rounded hover:bg-[#797a9c] transition">Share</button>
+        <button @click="shareCode"
+          class="bg-[rgba(40,41,71,1)] text-white px-4 py-2 rounded hover:bg-[#797a9c] transition">Share</button>
       </div>
     </header>
 
@@ -51,15 +51,23 @@ import '@xterm/xterm/css/xterm.css';
 import { EditorView, basicSetup } from 'codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { oneDark } from '@codemirror/theme-one-dark';
-import { keymap } from '@codemirror/view';
-import { indentWithTab } from '@codemirror/commands';
+import io from 'socket.io-client'
 
+// API and WebSocket URLs
+const API_URL = `http://${window.location.hostname}:8080/api/method/decode.api.update_code`;
+const SOCKET_URL = `${window.location.hostname}:9000`;
 
 const route = useRoute();
 const codeMirrorContainer = ref(null);
 const editor = ref(null);
 const fileName = ref(""); // Store filename
 const currentInput = ref('');
+const socket = ref(null);
+const codeContent = ref('');
+let isUpdating = false;
+let intervalId = null; 
+let inactivityTimeout = null;
+let isPaused = false; // Track if auto-refresh is paused
 
 // Constants for minimum widths
 const MIN_EDITOR_WIDTH = 400;
@@ -74,22 +82,194 @@ const commandHistory = ref([]);
 const historyIndex = ref(-1);
 
 // Reactive state
-const codeContent = ref('');
 const codeEditorWidth = ref(0);
 const consoleWidth = ref(0);
 
-// Fetch file details from the backend
-const fetchFileDetails = async () => {
+const connectSocket = () => {
   try {
-    const uuid = route.params.uuid;
-    const response = await fetch(`http://decode.local:8080/api/method/decode.api.getfiles?search_uuid=${uuid}`, {
-      method: "GET",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
+    console.log('🔄 Attempting to connect to WebSocket at:', SOCKET_URL);
+    
+    socket.value = io(SOCKET_URL, { 
+      transports: ['websocket'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      debug: true  // Enable socket.io debugging
     });
 
+    // Add debugging for all socket events
+    socket.value.onAny((event, ...args) => {
+      console.log('🔍 Socket Event:', event, 'Data:', args);
+    });
+
+    socket.value.on('connect', () => {
+      console.log('✅ Connected to WebSocket');
+      console.log('🔌 Socket Details:', {
+        id: socket.value.id,
+        connected: socket.value.connected,
+        disconnected: socket.value.disconnected,
+        transport: socket.value.io.engine.transport.name
+      });
+    });
+
+    // Add specific handler for code_update
+    socket.value.on('code_update', (data) => {
+      console.log('📥 Received code update:', {
+        event: 'code_update',
+        fileUuid: data?.file_uuid,
+        currentFileUuid: route.params.uuid,
+        hasCode: Boolean(data?.code),
+        codeLength: data?.code?.length,
+        modified: data?.modified
+      });
+
+      if (data?.file_uuid === route.params.uuid && data?.code !== undefined) {
+        updateEditorContent(data.code);
+        console.log('✅ Editor updated with new code');
+      }
+    });
+
+    // Error handling
+    socket.value.on('connect_error', (error) => {
+      console.error('⚠️ Socket connection error:', {
+        error: error.message,
+        type: error.type,
+        description: error.description
+      });
+    });
+
+    socket.value.on('disconnect', (reason) => {
+      console.log('❌ Socket disconnected:', {
+        reason,
+        wasConnected: socket.value?.connected,
+        transport: socket.value?.io?.engine?.transport?.name
+      });
+    });
+
+  } catch (error) {
+    console.error('❌ Socket initialization error:', error);
+  }
+};
+
+// Cleanup socket connection
+const cleanupSocket = () => {
+  try {
+    if (socket.value) {
+      socket.value.disconnect();
+      socket.value = null;
+      console.log('🔌 Socket disconnected and cleaned up');
+    }
+  } catch (error) {
+    console.error('⚠️ Error cleaning up socket:', error);
+  }
+};
+
+// Update editor content without triggering the update listener
+const updateEditorContent = (newCode) => {
+  if (editor.value && !isUpdating) {
+    isUpdating = true;
+    const transaction = editor.value.state.update({
+      changes: {
+        from: 0,
+        to: editor.value.state.doc.length,
+        insert: newCode
+      }
+    });
+    editor.value.dispatch(transaction);
+    isUpdating = false;
+  }
+};
+
+const initEditor = () => {
+  const fileUuid = route.params.uuid;
+  if (codeMirrorContainer.value && !editor.value) {
+    editor.value = new EditorView({
+      doc: codeContent.value,
+      extensions: [
+        basicSetup,
+        javascript(),
+        oneDark,
+        EditorView.updateListener.of(async (update) => {
+          if (update.docChanged && !isUpdating) {
+            const newCode = update.state.doc.toString();
+            codeContent.value = newCode;
+
+            // Debug log before saving
+            console.log('📤 Saving code:', {
+              fileUuid,
+              codeLength: newCode.length,
+              timestamp: new Date().toISOString()
+            });
+
+            try {
+              const response = await fetch(
+                `${API_URL}?file_uuid=${encodeURIComponent(fileUuid)}&code=${encodeURIComponent(newCode)}`,
+                {
+                  method: "PUT",
+                  credentials: 'include',
+                  headers: { 'Content-Type': 'application/json' }
+                }
+              );
+
+              if (!response.ok) {
+                throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
+              }
+
+              const data = await response.json();
+              
+              // Enhanced success logging
+              console.log('💾 Save response:', {
+                status: data.status,
+                message: data.message,
+                fileDetails: data.file,
+                timestamp: new Date().toISOString()
+              });
+
+              // Check if we received a websocket broadcast confirmation
+              if (data.message?.websocket_broadcast == true) {
+                console.log('📡 WebSocket broadcast confirmed by server');
+              }
+
+            } catch (error) {
+              // Enhanced error logging
+              console.error('❌ Save error:',{
+                error: error.message,
+                type: error.name,
+                fileUuid,
+                timestamp: new Date().toISOString()
+              });
+            }
+          }
+        }),
+      ],
+      parent: codeMirrorContainer.value,
+    });
+
+    console.log('✨ Editor initialized:', {
+      fileUuid,
+      initialContentLength: codeContent.value.length,
+      timestamp: new Date().toISOString()
+    });
+  }
+};
+
+
+// Fetch file details from the API
+const fetchFileDetails = async () => {
+  if (isPaused) return; // Skip fetching if paused
+
+  try {
+    const uuid = route.params.uuid;
+    const response = await fetch(
+      `http://decode.local:8080/api/method/decode.api.getfiles?search_uuid=${uuid}`,
+      {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
     const data = await response.json();
     console.log("API Response:", data);
 
@@ -110,7 +290,7 @@ const fetchFileDetails = async () => {
         });
       }
     } else {
-      alert(data.message); // Alert the message if file is not found
+      alert(data.message);
     }
   } catch (error) {
     console.error("Error fetching file details:", error);
@@ -120,6 +300,35 @@ const fetchFileDetails = async () => {
   }
 };
 
+// Start auto-refresh
+const startAutoRefresh = () => {
+  if (intervalId) clearInterval(intervalId);
+  intervalId = setInterval(fetchFileDetails, 5000); // Fetch every 5 sec
+  console.log('⏳ Auto-refresh started');
+};
+
+// Pause and Resume Mechanism
+const resetInactivityTimer = () => {
+  clearTimeout(inactivityTimeout);
+  
+  if (isPaused) {
+    isPaused = false;
+    console.log("🔄 Resuming auto-refresh...");
+    startAutoRefresh(); // Restart auto-refresh if it was paused
+  }
+
+  inactivityTimeout = setTimeout(() => {
+    console.log("🛑 No activity detected! Pausing updates for 10 sec...");
+    isPaused = true;
+    clearInterval(intervalId); // Stop auto-refresh
+
+    setTimeout(() => {
+      console.log("✅ Resuming updates after 10 sec...");
+      isPaused = false;
+      startAutoRefresh();
+    }, 10000); // Wait 10 sec before resuming
+  }, 5000); // 5 sec of inactivity triggers pause
+};
 
 
 // Handle terminal input
@@ -131,7 +340,7 @@ const handleTerminalInput = (data) => {
       currentInput.value = currentInput.value.slice(0, -1);
       terminal.value.write('\b \b');
     }
-  } 
+  }
   else if (char === '\r') { // Enter
     terminal.value.writeln('');
     if (currentInput.value.trim() !== '') {
@@ -232,7 +441,6 @@ const executePythonCode = async (code) => {
 };
 
 
-
 onMounted(() => {
   const totalWidth = window.innerWidth;
   codeEditorWidth.value = Math.floor(totalWidth * 0.7);
@@ -265,31 +473,15 @@ onMounted(() => {
     terminal.value.writeln('Terminal initialized...');
     terminal.value.writeln('$ ');
   }
-
-  // Initialize the CodeMirror editor
-  editor.value = new EditorView({
-    doc: codeContent.value,
-    extensions: [
-      basicSetup,
-      javascript(),
-      oneDark,
-      EditorView.updateListener.of(update => {
-        if (update.docChanged) {
-          codeContent.value = update.state.doc.toString();
-        }
-      }),
-      EditorView.theme({
-        '&': { height: '100%' },
-        '.cm-scroller': { overflow: 'auto' },
-        '&.cm-focused': { outline: 'none' }
-      }),
-    ],
-    parent: codeMirrorContainer.value
-  });
-
   // Fetch file details when the component is mounted
   fetchFileDetails();
+  initEditor ();
+  connectSocket();
+  startAutoRefresh();
 
+  // Detect user activity
+  window.addEventListener("mousemove", resetInactivityTimer);
+  window.addEventListener("keydown", resetInactivityTimer);
   // Add terminal input event listener
   terminal.value.onData((data) => {
     handleTerminalInput(data);
@@ -306,6 +498,7 @@ onMounted(() => {
   }
 
   window.addEventListener('resize', handleResize);
+
 });
 
 onUnmounted(() => {
@@ -316,6 +509,14 @@ onUnmounted(() => {
     editor.value.destroy();
   }
   window.removeEventListener('resize', handleResize);
+
+  clearInterval(intervalId);
+  clearTimeout(inactivityTimeout);
+  window.removeEventListener("mousemove", resetInactivityTimer);
+  window.removeEventListener("keydown", resetInactivityTimer);
+  console.log("🛑 Cleanup complete, stopping auto-refresh.");
+  
+  cleanupSocket();
 });
 
 // Handle window resize
@@ -363,6 +564,7 @@ const startResize = (e) => {
 
   document.addEventListener('mousemove', onMouseMove);
   document.addEventListener('mouseup', onMouseUp);
+
 };
 
 // Save code function (PATCH request)
@@ -376,7 +578,7 @@ const saveCode = async () => {
     const encodedUuid = encodeURIComponent(uuid);
 
     const response = await fetch(
-      `http://decode.local:8080/api/method/decode.api.updatecode?file_uuid=${encodedUuid}&code=${encodedCode}`,
+      `http://decode.local:8080/api/method/decode.api.update_code?file_uuid=${encodedUuid}&code=${encodedCode}`,
       {
         method: 'PUT',
         credentials: 'include',
@@ -395,7 +597,7 @@ const saveCode = async () => {
 
     console.log('Response Data:', data); // Log the response for debugging
 
-    if (data.message.status === 'success') {
+    if (data.message.message.status === 'success') {
       alert('Code saved successfully!');
     } else {
       alert(`${data.message.status}`);
@@ -473,3 +675,4 @@ const shareCode = () => {
 
 
 <!-- sudo sysctl net.ipv6.conf.all.disable_ipv6=1----solved the issue related to npm install monaco-editor -->
+<!-- 01952532-a3b9-7290-b079-20743e573ed7 -->

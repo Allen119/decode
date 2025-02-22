@@ -184,7 +184,6 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import plusLogo from '@/assets/images/plus.svg';
-import gitLogo from '@/assets/images/GitHub.svg';
 import Homelog from '@/assets/images/Homelog.svg';
 import files from '@/assets/images/filess.svg';
 import project from '@/assets/images/projects.svg';
