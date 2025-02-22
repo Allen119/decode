@@ -96,7 +96,21 @@
 
     <!-- Main Content Area -->
     <div class="absolute shadow-lg flex flex-col justify-center items-center transition-all duration-100 w-[82.58%] h-screen top-[7%] left-[17.42%] bg-[#d9d9d9]" :class="{ 'blur-sm': showContainer }">
-  <img src="@/assets/images/createjoin.svg" alt="Centered Image" class="object-contain cursor-pointer hover:opacity-80 max-w-[80%] max-h-[80%]" @click="performAction" />
+ <!-- 'Create' Text -->
+ <p class="text-[64px] font-medium text-[rgba(45,46,79,0.35)] font-inter max-w-[80%] max-h-[80%] cursor-pointer hover:opacity-80 mt-4" @click="performAction">
+      Create
+    </p>
+
+    <!-- '||' Text -->
+    <p class="text-[24px] font-medium text-[rgba(45,46,79,0.35)] font-inter">
+      ||
+    </p>
+
+    <!-- Image -->
+    <img src="@/assets/images/createjoin.svg" alt="Centered Image" 
+      class="object-contain cursor-pointer hover:opacity-80 max-w-[80%] max-h-[80%] mt-4" 
+      @click="performAction"
+    />
 
   <p class="text-[20px] font-bold mt-4 mb-4 transform translate-y-[100px] translate-x-[-579%]">
     Recent files
