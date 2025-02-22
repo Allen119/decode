@@ -232,7 +232,7 @@ const fetchUserFullname = async () => {
     if (data.message?.fullname) {
       fullname.value = data.message.fullname
     } else {
-      fullname.value = 'User not found'
+      fullname.value = '...'
     }
   } catch (err) {
     console.error('Error fetching fullname:', err)
