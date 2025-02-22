@@ -82,3 +82,5 @@ def get_likes():
     # Return the likes count
     return {"likes": doc.likes}  # Assuming 'likes' is a field in the LikeCounter Doctype
 
+
+

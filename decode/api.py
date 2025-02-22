@@ -314,3 +314,16 @@ def findbyuuid(uuid):
     # If file is not found, return a message
     return _(False)
 
+import frappe
+from frappe import _
+
+@frappe.whitelist(allow_guest=True)
+def get_user_fullname():
+    global x
+    user_id = x
+    fullname = frappe.get_value("user_reg", user_id, "fullname")
+
+    if fullname:
+        return {"fullname": fullname}
+    else:
+        return {"error": _("User not found.")}

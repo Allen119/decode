@@ -5,16 +5,15 @@
 
       <!-- Inner Box at Top of Sidebar -->
       <div class="w-full flex items-center px-4 h-[7%] bg-[#d9d9d9] border-[#2d2e4f]/35 transition-colors duration-300 ease-in-out flex-col justify-center">
-
-        <!-- Image -->
-        <img src="@/assets/images/Ellipse1.png" alt="Left Image" class="w-[30px] h-[30px] -translate-x-[80px] translate-y-[15px]" />
-
-        <!-- Centered Paragraph -->
-        <p class="text-[20px] font-light text-black translate-y-[-15px]">
-  PKD21IT009
-</p>
-
-      </div>
+    <img 
+      src="@/assets/images/Ellipse1.png" 
+      alt="Left Image" 
+      class="w-[30px] h-[30px] -translate-x-[80px] translate-y-[15px]" 
+    />
+    <p class="text-[20px] font-light text-black translate-y-[-15px] truncate max-w-[200px]">
+      {{ fullname }}
+    </p>
+  </div>
 
       <!-- Customizable Boxes -->
       <div class="absolute shadow-lg flex flex-col justify-start items-center overflow-y-auto w-full h-full top-[7%] left-0 bg-white scrollbar scrollbar-thumb-gray-400 scrollbar-track-gray-200">
@@ -214,7 +213,32 @@ const router = useRouter(); // Initialize the router instance
 const navigateTo = (path) => {
   router.push(path); // Use the router instance to navigate
 };
+const fullname = ref('')
 
+const fetchUserFullname = async () => {
+  try {
+    const response = await fetch('/api/method/decode.api.get_user_fullname', {
+      method: 'GET',
+      credentials: 'include', // Ensures session-based authentication
+    })
+
+    // Handle non-200 responses
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    if (data.message?.fullname) {
+      fullname.value = data.message.fullname
+    } else {
+      fullname.value = 'User not found'
+    }
+  } catch (err) {
+    console.error('Error fetching fullname:', err)
+    fullname.value = 'Error loading data'
+  }
+}
 
 
 // Dynamically managed boxes with custom styles
@@ -457,6 +481,7 @@ const handleClickOutside = (event) => {
 
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
+  fetchUserFullname()
 })
 
 onUnmounted(() => {
