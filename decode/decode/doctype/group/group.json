@@ -1,0 +1,63 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "UUID",
+ "creation": "2025-02-23 11:01:47.688077",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "groupname",
+  "group_owner",
+  "description",
+  "group_members"
+ ],
+ "fields": [
+  {
+   "fieldname": "groupname",
+   "fieldtype": "Data",
+   "label": "groupname"
+  },
+  {
+   "fieldname": "group_owner",
+   "fieldtype": "Link",
+   "label": "group_owner",
+   "options": "user_reg"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "description"
+  },
+  {
+   "fieldname": "group_members",
+   "fieldtype": "Table",
+   "label": "group_members",
+   "options": "group_members"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-02-23 14:30:08.983075",
+ "modified_by": "Administrator",
+ "module": "decode",
+ "name": "group",
+ "naming_rule": "UUID",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

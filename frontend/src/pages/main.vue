@@ -95,10 +95,22 @@
 
     <!-- Main Content Area -->
     <div class="absolute shadow-lg flex flex-col justify-center items-center transition-all duration-100 w-[82.58%] h-screen top-[7%] left-[17.42%] bg-[#d9d9d9]" :class="{ 'blur-sm': showContainer }">
- <!-- 'Create' Text -->
- <p class="text-[64px] font-medium text-[rgba(45,46,79,0.35)] font-inter max-w-[80%] max-h-[80%] cursor-pointer hover:opacity-80 mt-4" @click="performAction">
-      Create
-    </p>
+ <!-- 'Create' Text (Click to Show Blank Container) -->
+ <p 
+    class="text-[64px] font-medium text-[rgba(45,46,79,0.35)] font-inter max-w-[80%] max-h-[80%] cursor-pointer hover:opacity-80 mt-4" 
+    @click="toggleCreateContainer"
+  >
+    Create
+  </p>
+
+  <!-- Blank Container -->
+  <div 
+    v-if="showCreateContainer" 
+    ref="createContainerRef" 
+    class="absolute top-16 left-10 bg-white shadow-lg rounded-lg w-80 h-40 border border-gray-200"
+  >
+    <!-- Empty container with no content -->
+  </div>
 
     <!-- '||' Text -->
     <p class="text-[24px] font-medium text-[rgba(45,46,79,0.35)] font-inter">
@@ -108,9 +120,17 @@
     <!-- Image -->
     <img src="@/assets/images/createjoin.svg" alt="Centered Image" 
       class="object-contain cursor-pointer hover:opacity-80 max-w-[80%] max-h-[80%] mt-4" 
-      @click="performAction"
+      @click="toggleJoinContainer"
     />
-
+  
+    <!-- Blank Container -->
+  <div 
+    v-if="showJoinContainer" 
+    ref="joinContainerRef" 
+    class="absolute top-16 left-10 bg-white shadow-lg rounded-lg w-80 h-40 border border-gray-200"
+  >
+    <!-- Empty container with no content -->
+  </div>
   <p class="text-[20px] font-bold mt-4 mb-4 transform translate-y-[100px] translate-x-[-579%]">
     Recent files
   </p>
@@ -460,24 +480,52 @@ const performAction = () => {
 };
 
 const fileName = ref(""); // Holds the input file name
-const showContainer = ref(false)
-const containerRef = ref(null)
 const saveError = ref(""); // Holds error messages
+// References for containers
+const containerRef = ref(null)
+const createContainerRef = ref(null)
+const joinContainerRef = ref(null)
 
+// States to track visibility
+const showContainer = ref(false)
+const showCreateContainer = ref(false)
+const showJoinContainer = ref(false)
+
+// Toggle functions for each container
 const toggleContainer = () => {
   showContainer.value = !showContainer.value
 }
 
+const toggleCreateContainer = () => {
+  showCreateContainer.value = !showCreateContainer.value
+}
+
+const toggleJoinContainer = () => {
+  showJoinContainer.value = !showJoinContainer.value
+}
+
+// Handle clicks outside of containers
 const handleClickOutside = (event) => {
   if (
-    showContainer.value &&
-    containerRef.value &&
-    !containerRef.value.contains(event.target) &&
-    !event.target.closest('button')
+    (showCreateContainer.value &&
+      createContainerRef.value &&
+      !createContainerRef.value.contains(event.target) &&
+      !event.target.closest('p')) ||
+    (showContainer.value &&
+      containerRef.value &&
+      !containerRef.value.contains(event.target) &&
+      !event.target.closest('button')) ||
+    (showJoinContainer.value &&
+      joinContainerRef.value &&
+      !joinContainerRef.value.contains(event.target) &&
+      !event.target.closest('img')) // Assuming the join container opens via an image click
   ) {
+    showCreateContainer.value = false
     showContainer.value = false
+    showJoinContainer.value = false
   }
 }
+
 
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
