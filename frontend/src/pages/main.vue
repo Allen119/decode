@@ -94,7 +94,7 @@
 
 
     <!-- Main Content Area -->
-    <div class="absolute shadow-lg flex flex-col justify-center items-center transition-all duration-100 w-[82.58%] h-screen top-[7%] left-[17.42%] bg-[#d9d9d9]" :class="{ 'blur-sm': showContainer }">
+    <div class="absolute shadow-lg flex flex-col justify-center items-center transition-all duration-100 w-[82.58%] h-screen top-[7%] left-[17.42%] bg-[#d9d9d9]" :class="{ 'blur-sm': showContainer || showCreateContainer}">
  <!-- 'Create' Text (Click to Show Blank Container) -->
  <p 
     class="text-[64px] font-medium text-[rgba(45,46,79,0.35)] font-inter max-w-[80%] max-h-[80%] cursor-pointer hover:opacity-80 mt-4" 
@@ -102,16 +102,6 @@
   >
     Create
   </p>
-
-  <!-- Blank Container -->
-  <div 
-    v-if="showCreateContainer" 
-    ref="createContainerRef" 
-    class="absolute top-16 left-10 bg-white shadow-lg rounded-lg w-80 h-40 border border-gray-200"
-  >
-    <!-- Empty container with no content -->
-  </div>
-
     <!-- '||' Text -->
     <p class="text-[24px] font-medium text-[rgba(45,46,79,0.35)] font-inter">
       ||
@@ -122,15 +112,7 @@
       class="object-contain cursor-pointer hover:opacity-80 max-w-[80%] max-h-[80%] mt-4" 
       @click="toggleJoinContainer"
     />
-  
-    <!-- Blank Container -->
-  <div 
-    v-if="showJoinContainer" 
-    ref="joinContainerRef" 
-    class="absolute top-16 left-10 bg-white shadow-lg rounded-lg w-80 h-40 border border-gray-200"
-  >
-    <!-- Empty container with no content -->
-  </div>
+
   <p class="text-[20px] font-bold mt-4 mb-4 transform translate-y-[100px] translate-x-[-579%]">
     Recent files
   </p>
@@ -209,7 +191,92 @@
     </div>
   </div>
 
+  <div
+    v-if="showCreateContainer"
+    ref="createContainerRef"
+    class="fixed inset-0 flex items-center justify-center bg-white w-[30%] h-[40%] top-[30%] left-[40%]">
+    <div class="bg-white p-6 rounded-lg shadow-lg w-[100%] h-[100%]">
+      <h2 class="text-xl font-bold mb-4">Create New Course</h2>
+      <!-- Project Name Input -->
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700">Course Name</label>
+        <input
+          type="text"
+          v-model="projectName"
+          placeholder="Enter course name"
+          class="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#d9d9d9]"
+        />
+        <p v-if="courseNameError" class="text-red-500 text-sm mt-1">{{ courseNameError }}</p>
+      </div>
+      <!-- Username Input (Uneditable) -->
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700">Username</label>
+        <input
+          type="text"
+          :value="fullname"
+          disabled
+          class="mt-1 block w-full p-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
+        />
+      </div>
+      <!-- Project Description Input -->
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700">Course Description</label>
+        <textarea
+          v-model="projectDescription"
+          placeholder="Enter course description"
+          class="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#d9d9d9]"
+        ></textarea>
+      </div>
+      <!-- Create Button -->
+      <div class="flex justify-end">
+        <button
+          @click="validateAndCreate"
+          class="bg-[rgba(40,41,71,1)] text-white font-bold rounded-md px-4 py-2 hover:bg-[#797a9c] focus:outline-none"
+        >
+          Create
+        </button>
+      </div>
+    </div>
+  </div>
 
+  <div
+    v-if="showJoinContainer"
+    ref="joinContainerRef"
+    class="fixed inset-0 flex items-center justify-center bg-white w-[30%] h-[30%] top-[30%] left-[40%]">
+    <div class="bg-white p-6 rounded-lg shadow-lg w-[100%] h-[100%]">
+      <h2 class="text-xl font-bold mb-4">Join New Course</h2>
+      <!-- Project Name Input -->
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700">Course Id</label>
+        <input
+          type="text"
+          v-model="courseId"
+          placeholder="Enter course id"
+          class="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#d9d9d9]"
+        />
+        <p v-if="courseIdError" class="text-red-500 text-sm mt-1">{{ courseIdError }}</p>
+      </div>
+      <!-- Username Input (Uneditable) -->
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700">Username</label>
+        <input
+          type="text"
+          :value="fullname"
+          disabled
+          class="mt-1 block w-full p-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
+        />
+      </div>
+      <!-- Create Button -->
+      <div class="flex justify-end">
+        <button
+          @click="validateAndJoin"
+          class="bg-[rgba(40,41,71,1)] text-white font-bold rounded-md px-4 py-2 hover:bg-[#797a9c] focus:outline-none"
+        >
+          Join
+        </button>
+      </div>
+    </div>
+  </div>
 
   </div>
 </template>
@@ -234,32 +301,6 @@ const navigateTo = (path) => {
   router.push(path); // Use the router instance to navigate
 };
 const fullname = ref('')
-
-const fetchUserFullname = async () => {
-  try {
-    const response = await fetch('/api/method/decode.api.get_user_fullname', {
-      method: 'GET',
-      credentials: 'include', // Ensures session-based authentication
-    })
-
-    // Handle non-200 responses
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`)
-    }
-
-    const data = await response.json()
-
-    if (data.message?.fullname) {
-      fullname.value = data.message.fullname
-    } else {
-      fullname.value = '...'
-    }
-  } catch (err) {
-    console.error('Error fetching fullname:', err)
-    fullname.value = 'Error loading data'
-  }
-}
-
 
 // Dynamically managed boxes with custom styles
 const boxes = ref([
@@ -473,6 +514,32 @@ const recentbox = ref([
   },
 ]);
 
+
+const fetchUserFullname = async () => {
+  try {
+    const response = await fetch('/api/method/decode.api.get_user_fullname', {
+      method: 'GET',
+      credentials: 'include', // Ensures session-based authentication
+    })
+
+    // Handle non-200 responses
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    if (data.message?.fullname) {
+      fullname.value = data.message.fullname
+    } else {
+      fullname.value = '...'
+    }
+  } catch (err) {
+    console.error('Error fetching fullname:', err)
+    fullname.value = 'Error loading data'
+  }
+}
+
 const performAction = () => {
   console.log('Clicked');
   // Add your custom logic here, e.g., navigating to a new route or triggering a modal
@@ -481,6 +548,13 @@ const performAction = () => {
 
 const fileName = ref(""); // Holds the input file name
 const saveError = ref(""); // Holds error messages
+
+const projectName = ref('');
+const projectDescription = ref('');
+const courseId = ref('');
+const courseNameError = ref("");
+const courseIdError = ref("");
+
 // References for containers
 const containerRef = ref(null)
 const createContainerRef = ref(null)
@@ -490,6 +564,8 @@ const joinContainerRef = ref(null)
 const showContainer = ref(false)
 const showCreateContainer = ref(false)
 const showJoinContainer = ref(false)
+
+
 
 // Toggle functions for each container
 const toggleContainer = () => {
@@ -525,6 +601,55 @@ const handleClickOutside = (event) => {
     showJoinContainer.value = false
   }
 }
+
+// Validation and course creation function
+const validateAndCreate = () => {
+  if (!projectName.value.trim()) {
+    courseNameError.value = "Course name cannot be empty.";
+    return;
+  }
+  courseNameError.value = ""; // Clear error if valid
+
+  createProject();
+};
+
+const createProject = async () => {
+  try {
+    const response = await fetch("http://decode.local:8080/api/method/decode.api.reg_group", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        groupname: projectName.value,
+        description: projectDescription.value,
+      }),
+    });
+
+    console.log("Raw Response:", response); // Log raw response
+
+    const data = await response.json();
+    
+    console.log("API Response:", data); // Log parsed API response
+
+    alert(data.message.message);
+  } catch (error) {
+    console.error("Fetch Error:", error); // Log error details
+    alert("Error creating group: " + error.message);
+  }
+};
+
+const validateAndJoin = () => {
+  if (!courseId.value.trim()) {
+    courseIdError.value = "Course ID cannot be empty.";
+    return;
+  }
+  courseIdError.value = ""; // Clear error if valid
+
+  joinProject();
+};
+
+const joinProject = () => {
+  alert("Course Created Successfully!"); // Replace with actual API call
+};
 
 
 onMounted(() => {

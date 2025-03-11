@@ -6,7 +6,7 @@
       <!-- Logo and User ID Section -->
       <div class="flex items-center gap-4">
         <img src="@/assets/images/logo.png" alt="Logo" class="object-contain"
-          :style="{ maxHeight: '80%', width: '15%', height: 'auto' }" />
+          :style="{ maxHeight: '80%', width: '10%', height: 'auto' }" />
         <span class="text-lg text-black">{{ fileName }}</span> <!-- File name displayed here -->
       </div>
       <!-- Action Buttons Section -->
@@ -502,23 +502,48 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  if (terminal.value) {
-    terminal.value.dispose();
+  // First, disable and null any references to the resize observer
+  if (typeof resizeObserver !== 'undefined' && resizeObserver) {
+    resizeObserver.disconnect();
   }
-  if (editor.value) {
-    editor.value.destroy();
-  }
-  window.removeEventListener('resize', handleResize);
-
+  
+  // Clear all timers and intervals first
   clearInterval(intervalId);
   clearTimeout(inactivityTimeout);
+  
+  // Remove event listeners
+  window.removeEventListener('resize', handleResize);
   window.removeEventListener("mousemove", resetInactivityTimer);
   window.removeEventListener("keydown", resetInactivityTimer);
-  console.log("🛑 Cleanup complete, stopping auto-refresh.");
   
+  // Nullify the fitAddon reference without trying to dispose it
+  fitAddon.value = null;
+  
+  // Dispose the terminal - this should handle addon cleanup internally
+  if (terminal.value) {
+    // Create a local reference and null the reactive reference
+    const term = terminal.value;
+    terminal.value = null;
+    
+    // Now dispose the terminal with a small delay to ensure Vue has processed the nullification
+    setTimeout(() => {
+      try {
+        term.dispose();
+      } catch (error) {
+        console.log("Terminal disposal error:", error);
+      }
+    }, 0);
+  }
+  
+  // Clean up the editor
+  if (editor.value) {
+    editor.value.destroy();
+    editor.value = null;
+  }
+  
+  console.log("🛑 Cleanup complete, stopping auto-refresh.");
   cleanupSocket();
 });
-
 // Handle window resize
 const handleResize = () => {
   if (fitAddon.value) {

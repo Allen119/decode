@@ -7,7 +7,7 @@
  "engine": "InnoDB",
  "field_order": [
   "groupname",
-  "group_owner",
+  "groupowner",
   "description",
   "group_members"
  ],
@@ -16,12 +16,6 @@
    "fieldname": "groupname",
    "fieldtype": "Data",
    "label": "groupname"
-  },
-  {
-   "fieldname": "group_owner",
-   "fieldtype": "Link",
-   "label": "group_owner",
-   "options": "user_reg"
   },
   {
    "fieldname": "description",
@@ -33,11 +27,17 @@
    "fieldtype": "Table",
    "label": "group_members",
    "options": "group_members"
+  },
+  {
+   "fieldname": "groupowner",
+   "fieldtype": "Link",
+   "label": "group_owner",
+   "options": "user_reg"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-02-23 14:30:08.983075",
+ "modified": "2025-03-09 10:46:18.200204",
  "modified_by": "Administrator",
  "module": "decode",
  "name": "group",

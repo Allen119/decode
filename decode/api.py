@@ -327,3 +327,41 @@ def get_user_fullname():
         return {"fullname": fullname}
     else:
         return {"error": _("User not found.")}
+    
+    
+"""Group"""
+
+import frappe
+
+@frappe.whitelist(allow_guest=True)
+def reg_group(groupname,description):
+    global x
+    if x is None:
+        return {"message": "You should log in first.", "file": None}
+    try:
+        # Validate inputs
+        if not groupname:
+            return {"message": "All fields are required."}
+
+        # Check if the group name already exists
+        if frappe.db.exists("group", {"groupname": groupname}):
+            return {"message": "Group name already exists."}
+
+        # Create a new Group document
+        group_doc = frappe.get_doc({
+            "doctype": "group",
+            "groupname": groupname,
+            "groupowner": x,
+            "description": description
+        })
+        group_doc.insert(ignore_permissions=True)
+        frappe.db.commit()
+
+        # Return success message
+        return {"message": "Group registered successfully!", "name": group_doc.name}
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Register Group Error")
+        return {"message": f"An error occurred"}
+
+

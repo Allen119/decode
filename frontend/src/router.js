@@ -46,6 +46,18 @@ const routes = [
     path: '/likect',
     component: () => import('@/pages/likect.vue'),
   },
+
+  {
+    name: 'member',
+    path: '/member',
+    component: () => import('@/pages/member.vue'),
+  },
+
+  {
+    name: 'owner',
+    path: '/owner',
+    component: () => import('@/pages/owner.vue'),
+  },
 ]
 
 let router = createRouter({
