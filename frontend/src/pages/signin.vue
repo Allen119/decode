@@ -77,39 +77,38 @@ const navigateTo = (path) => {
 };
 
 const loginUser = async () => {
-  if (!email.value || !password.value) {
-    loginError.value = "Please enter both email and password.";
-    return;
-  }
-
+  loginError.value = "";
   try {
-    const response = await fetch('http://decode.local:8080/api/method/decode.api.login_user', {
-      method: 'POST',
-      credentials: 'include',
+    const response = await fetch("http://decode.local:8080/api/method/decode.api.login_user", {
+      method: "POST",
+      credentials: "include",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         email: email.value,
         password: password.value,
       }),
     });
-
+    
     const data = await response.json();
     console.log('Full API Response:', data);
-
-    if (data.message && data.message.message === "Login successful!") {
-      console.log('Redirecting to /main...');
-      //alert('Login successful!');
-      router.push('/main');
+    
+    // Check for deeply nested structure
+    if (data.message && data.message.message && data.message.message.message === "Login successful!") {
+      localStorage.setItem("userToken", data.message.message.token); // Store the token
+      console.log('Token:', data.message.message.token);
+      localStorage.setItem("isAuthenticated", "true"); // Store login status
+      router.push("/main"); // Redirect to the main page
     } else {
-      loginError.value = 'Invalid credentials. Please try again.';
+      loginError.value = "Invalid credentials. Please try again.";
     }
   } catch (error) {
-    console.error('Login error:', error);
-    loginError.value = 'Network error. Please try again.';
+    console.error("Login error:", error);
+    loginError.value = "Network error. Please try again.";
   }
 };
+
 </script>
 
 

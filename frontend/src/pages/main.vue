@@ -602,7 +602,6 @@ const handleClickOutside = (event) => {
   }
 }
 
-// Validation and course creation function
 const validateAndCreate = () => {
   if (!projectName.value.trim()) {
     courseNameError.value = "Course name cannot be empty.";
@@ -613,6 +612,7 @@ const validateAndCreate = () => {
   createProject();
 };
 
+ 
 const createProject = async () => {
   try {
     const response = await fetch("http://decode.local:8080/api/method/decode.api.reg_group", {
@@ -630,12 +630,23 @@ const createProject = async () => {
     
     console.log("API Response:", data); // Log parsed API response
 
-    alert(data.message.message);
+    if (data.message && data.message.name && data.message.message=="Group registered successfully!") {
+      //alert(data.message.message); //Show success message
+      courseId.value = data.message.name; 
+      window.location.href = `http://decode.local:8080/frontend/owner/${courseId.value}`; // Redirect
+    } 
+    else if(data.message.message == "Group name already exists."){
+      courseNameError.value = "Course name already exists. Please enter a different name.";
+    }
+    else {
+      alert("Something unexpected happened. Please try again.");
+    }
   } catch (error) {
     console.error("Fetch Error:", error); // Log error details
     alert("Error creating group: " + error.message);
   }
 };
+
 
 const validateAndJoin = () => {
   if (!courseId.value.trim()) {
@@ -647,10 +658,31 @@ const validateAndJoin = () => {
   joinProject();
 };
 
-const joinProject = () => {
-  alert("Course Created Successfully!"); // Replace with actual API call
-};
+const joinProject = async () => {
+  try {
+    const response = await fetch(`http://decode.local:8080/api/method/decode.api.join_project?course_id=${encodeURIComponent(courseId.value)}`, {
+      method: "GET",
+      credentials: "include",
+    });
 
+    const data = await response.json();
+    console.log("Server Response:", data);
+
+    if (data.message.message == "Course found.") {
+      window.location.href = `http://decode.local:8080/frontend/member/${courseId.value}`; // Redirect
+    } 
+    else if(data.message.message == "User already a member of the group."){
+      courseIdError.value = "User already a member of the group.";
+    }
+    else {
+      courseIdError.value = "Enter a valid Course ID"; // Show error message
+    }
+
+  } catch (error) {
+    console.error("Error joining project:", error);
+    courseIdError.value = "Network error. Please try again."; // Handle network errors
+  }
+};
 
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)

@@ -49,13 +49,13 @@ const routes = [
 
   {
     name: 'member',
-    path: '/member',
+    path: '/member/:courseId',
     component: () => import('@/pages/member.vue'),
   },
 
   {
     name: 'owner',
-    path: '/owner',
+    path: '/owner/:courseId',
     component: () => import('@/pages/owner.vue'),
   },
 ]

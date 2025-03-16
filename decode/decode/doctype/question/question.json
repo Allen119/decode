@@ -1,14 +1,14 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "UUID",
  "creation": "2025-02-23 14:31:02.634223",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
   "title",
   "description",
-  "group",
-  "guide",
+  "courseid",
   "answer"
  ],
  "fields": [
@@ -29,24 +29,21 @@
    "options": "answer"
   },
   {
-   "fieldname": "group",
+   "fieldname": "courseid",
    "fieldtype": "Link",
-   "label": "group",
-   "options": "group"
-  },
-  {
-   "fieldname": "guide",
-   "fieldtype": "Link",
-   "label": "guide",
-   "options": "user_reg"
+   "in_list_view": 1,
+   "label": "courseId",
+   "options": "group",
+   "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-02-23 14:59:12.404468",
+ "modified": "2025-03-16 13:03:44.199728",
  "modified_by": "Administrator",
  "module": "decode",
  "name": "question",
+ "naming_rule": "UUID",
  "owner": "Administrator",
  "permissions": [
   {

@@ -1,289 +1,184 @@
 <template>
-    <header class="header">
-           <!-- Welcome Message and Course Name Section -->
-        <div class="welcome-message-section">
-          <h2>{{ welcomeMessage }}</h2>
-          <div class="course-name-section">
-            <h3>{{ courseName }}</h3>
-          </div>
+  <div id="app" class="font-sans h-screen w-screen bg-white text-white flex flex-col"
+    :style="{ fontFamily: 'Inter, sans-serif' }">
+    <!-- Header -->
+    <header class="bg-[rgba(217,217,217,1)] text-purple-700 p-4 flex justify-between items-center h-[7%] relative"
+      :style="{ fontFamily: 'Inter, sans-serif' }">
+      <!-- Logo and User ID Section -->
+      <div class="flex items-center gap-4">
+        <img src="@/assets/images/logo.png" alt="Logo" class="object-contain"
+          :style="{ maxHeight: '80%', width: '10%', height: 'auto' }" />
+        <span class="text-[150%] text-black">Hi user welcome back</span>
+      </div>
+
+      <!-- Course Name (Centered and 30% from the left) -->
+      <p class="absolute text-[150%] right-[10%] top-1/2 transform -translate-y-1/2 text-lg text-black font-light">
+        {{ groupDetails.groupname }}
+      </p>
+
+
+    </header>
+
+    <div class="absolute bg-[#D9D9D9] w-[52%] h-[87%] top-[10%] right-[47%] ">
+      <div class="absolute w-[70%] p-4 bg-[#D9D9D9] rounded-lg left-[1.5%]">
+        <h3 class="text-lg mb-2 text-black font-light">Course id</h3>
+        <div class="w-full p-3 bg-white rounded-md border border-gray-300 shadow-sm text-black font-light">
+          {{ courseId }}
         </div>
-        </header>
-      <div class="container">
-      
-        <!-- Content Section -->
-        <div class="content">
-          <!-- Left Panel -->
-          <div class="left-panel">
-            <label>Course Id</label>
-            <input type="text" v-model="courseId" class="input-box" />
-    
-            <label>Post question</label>
-            <div class= "postquestion">
-              <input type="text" v-model="title" placeholder="Title" class="input-box dark" />
-              <textarea v-model="description" placeholder="Description" class="input-box dark"></textarea>
+      </div>
+      <h3 class="absolute text-lg text-black font-light left-[3.5%] top-[15%]">Course Description</h3>
+      <div class="absolute rounded-lg w-[66.6%] h-[27%] p-4 bg-white left-[3.2%] top-[18.5%] text-black font-light
+            break-words overflow-y-auto">
+        {{ groupDetails.description }}
+      </div>
+
+
+      <div class="absolute w-[70%] h-[50%] p-4 bg-[#D9D9D9] rounded-lg left-[1.5%] bottom-[4%]">
+        <h3 class="text-lg mb-2 text-black font-light">Post question</h3>
+        <!-- Make this container relative so child absolute div positions inside it -->
+        <div class="relative w-full h-full">
+          <div class="absolute w-[100%] h-[100%] bg-white rounded-md border border-gray-300 shadow-sm">
+            <div class="absolute w-[90%] left-[5%] top-[6%] bg-[#282947] rounded-lg shadow-md">
+              <input type="text" placeholder="Title" v-model="title"
+                class="w-full h-full bg-transparent text-white placeholder-gray-400 border border-gray-600 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
-            
-            <button class="post-btn" @click="postQuestion">Post</button>
-    
-            <!-- Questions Section -->
-            <div class="questions">
-              <label>Questions</label>
-              <ol>
-                <li v-for="(question, index) in questions" :key="index">
-                  <strong>{{ question.title }}</strong>
-                  <p>{{ question.description }}</p>
-                </li>
-              </ol>
+            <div class="absolute w-[90%] left-[5%] h-[60%] top-[23%] bg-[#282947] rounded-lg shadow-md p-4">
+              <textarea placeholder="Description" v-model="description"
+                class="w-full h-full bg-transparent text-white placeholder-gray-400 border border-gray-600 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 align-top resize-none break-words overflow-y-auto"></textarea>
             </div>
-          </div>
-    
-          <!-- Right Panel -->
-           <div class="right-panel1">
-            <div class="right-panel">
-              <label>Description</label>
-              <div class="description-box">{{ courseDescription }}</div>
+
+            <div class="absolute bottom-4 right-[5%] top-[87%]">
+              <button @click="postQuestion"
+                class="bg-[rgba(40,41,71,1)] text-white px-4 py-2 rounded hover:bg-[#797a9c] transition">
+                Post
+              </button>
             </div>
-            <!-- Members Button -->
-              <div class="members-button-container">
-                <button class="members-btn">Members</button>
-              </div>
           </div>
         </div>
       </div>
-    </template>
-    
-    <script setup>
-    import { ref, onMounted } from 'vue';
-    import { useRoute } from 'vue-router';
-    
-    const route = useRoute();
-    
-    // Reactive data
-    const welcomeMessage = ref('Loading...');
-    const courseName = ref('');
-    const courseDescription = ref('');
-    const courseId = ref('');
-    const title = ref('');
-    const description = ref('');
-    const questions = ref([]);
-    
-    // Fetch the logged-in user's full name
-    const fetchUserFullName = async () => {
-      try {
-        const response = await fetch('/api/method/codecampus.api.get_user_fullname', {
-          method: 'GET',
-          credentials: 'include',
-        });
-    
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-    
-        const data = await response.json();
-    
-        if (data.message?.fullname) {
-          welcomeMessage.value = `Hi ${data.message.fullname}, Welcome back!`;
-        } else {
-          welcomeMessage.value = 'Hi User, Welcome back!';
-        }
-      } catch (error) {
-        console.error('Error fetching user full name:', error);
-        welcomeMessage.value = 'Hi User, Welcome back!';
-      }
-    };
-    
-    // Fetch course details from query parameters
-    const fetchCourseDetails = () => {
-      if (route.query.courseName && route.query.courseDescription) {
-        courseName.value = route.query.courseName;
-        courseDescription.value = route.query.courseDescription;
-      } else {
-        console.log('No course details found in query parameters.');
-      }
-    };
-    
-    // Post a new question
-    const postQuestion = () => {
-      if (title.value && description.value) {
-        questions.value.push({ title: title.value, description: description.value });
-        title.value = '';
-        description.value = '';
-      }
-    };
-    
-    // Fetch data when the component is mounted
-    onMounted(() => {
-      fetchUserFullName();
-      fetchCourseDetails();
+
+
+
+      <!-- <p class="absolute text-lg text-black font-light left-[3%] top-[30%]">Questions</p> -->
+      <!-- <div class="absolute bg-white w-[80%] h-[65%] top-[32%] left-[3.2%] rounded-[74px]">
+        <h3 class="absolute text-lg text-black font-light left-[3%] top-[5%]">Questions</h3>
+      </div> -->
+    </div>
+    <div class="absolute bg-[#D9D9D9] w-[40%] h-[75%] top-[16%] right-[3.5%] rounded-[74px]">
+      <div class="absolute bg-white w-[92%] h-[90%] top-[5%] right-[4%] rounded-[74px] overflow-hidden">
+        <h3 class="absolute text-lg text-black font-light left-[3%] top-[5%]">Questions</h3>
+        <!-- List of questions - making this container scrollable while keeping the header fixed -->
+        <div class="absolute left-[3%] top-[12%] w-[93%] h-[80%] overflow-y-auto pr-4">
+          <ul class="text-lg text-black font-light">
+            <li v-for="(question, index) in questions" :key="question.name" class="mb-2">
+              {{ index + 1 }}. {{ question.title }}
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  <div class="absolute bg-white w-[6%] h-[5%] bottom-[2%] right-[4%] rounded-[74px]">
+    <button @click="getMembers"
+      class="absolute bg-[rgba(40,41,71,1)] text-white px-4 py-2 rounded hover:bg-[#797a9c] transition">
+      Members
+    </button>
+  </div>
+  </div>
+</template>
+
+<script setup>
+import { useRoute } from 'vue-router';
+import { ref, onMounted } from "vue";
+
+const route = useRoute();
+const courseId = ref(route.params.courseId);
+const groupDetails = ref({
+  groupname: '',
+  groupowner: '',
+  description: ''
+});
+
+const fetchGroupDetails = async () => {
+  try {
+    const response = await fetch(
+      `http://decode.local:8080/api/method/decode.api.get_group_details?courseId=${courseId.value}`
+    );
+    const data = await response.json();
+
+    // Extract just the fields we need from the response
+    if (data.message && !data.message.error) {
+      groupDetails.value = {
+        groupname: data.message.groupname,
+        groupowner: data.message.groupowner,
+        description: data.message.description
+      };
+      console.log("Group details:", groupDetails.value);
+    } else {
+      console.error("API Error:", data.message?.error || "Unknown error");
+    }
+  } catch (error) {
+    console.error("Error fetching group details:", error);
+  }
+};
+
+const title = ref("");  // Reactive variable for title
+const description = ref("");  // Reactive variable for description
+
+const postQuestion = async () => {
+  try {
+    const response = await fetch("http://decode.local:8080/api/method/decode.api.post_question", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        title: title.value,
+        description: description.value,
+        courseId: courseId.value,
+      }),
     });
-    </script>
-    
-    <style scoped>
-    .container {
-      padding: 20px;
-      background: hsl(0, 100%, 100%);
-      min-height: 100vh;
-      
+
+    const data = await response.json();
+    console.log("Server Response:", data);
+
+    if (data.message.message === "Question posted successfully!") {
+      alert("Question posted!");
+      title.value = ""; // Reset fields
+      description.value = "";
+      fetchQuestions(); // Refresh question list
+    } else if (data.message.message.includes("already exists")) {
+      alert("A question with this title already exists. Please use a different title.");
+    } else {
+      alert("Failed to post question. You may need to log in.");
     }
-    
-    .header {
-      background: #ccc;
-      padding: 1px;
-      font-size: 20px;
+  } catch (error) {
+    console.error("Error posting question:", error);
+    alert("Network error. Try again.");
+  }
+};
+
+const questions = ref([]);
+
+const fetchQuestions = async () => {
+  try {
+    const response = await fetch(`http://decode.local:8080/api/method/decode.api.get_questions?courseId=${courseId.value}`, {
+      method: "GET",
+      credentials: "include",
+    });
+    const data = await response.json();
+    if (data.message && data.message.questions) {
+      questions.value = data.message.questions; // Store filtered questions
+    } else {
+      console.error("Unexpected API response format:", data);
     }
-    
-    
-    
-    /* Welcome Message and Course Name Section */
-    .welcome-message-section {
-      display: flex;
-      align-items: center;
-      justify-content: space-between; /* Align items to the left and right */
-      text-align: left;
-      margin: 8px 0;
-    }
-    
-    .welcome-message-section h2 {
-      font-size: 1.5rem;
-      color: #252544;
-      margin: 0; /* Remove default margin */
-      font-weight:500;
-      margin-left:10px;
-    }
-    
-    .course-name-section h3 {
-      font-size: 1.5rem;
-      color: #252544;
-      margin: 0; /* Remove default margin */
-      font-weight:500;
-      margin-right: 10px;
-    }
-    
-    .content {
-      display: flex;
-      flex-direction: column;
-      margin-top: 10px;
-    }
-    
-    .left-panel {
-      padding: 10px;
-      background: #d3d3d3;
-      margin-bottom: 10px;
-      border-radius: 5px;
-      position: relative; /* Ensure relative positioning for child elements */
-    }
-    .postquestion {
-      margin: 5px 0;
-       background: rgb(255, 253, 253);
-      padding: 4px;
-      box-sizing: border-box;
-      border-radius: 5px;
-    }
-    .right-panel {
-      height: 420px;
-      padding: 10px;
-      background: #d3d3d3;
-      margin-bottom: 10px;
-      border-radius: 35px;
-      position: relative; /* Ensure relative positioning for child elements */
-    }
-    .right-panel1 {
-      min-width: 25%;
-      height: 520px;
-      padding: 10px;
-      background: hsl(0, 100%, 100%);
-      margin-bottom: 10px;
-      
-      position: relative; /* Ensure relative positioning for child elements */
-    }
-    
-    .input-box {
-      width: 100%;
-      margin: 5px 0;
-      padding: 4px;
-      box-sizing: border-box;
-      border-radius: 5px;
-    }
-    
-    .input-box.dark {
-      background: #252544;
-      color: white;
-      border: none;
-    }
-    
-    .post-btn,
-    .members-btn {
-      background: #252544;
-      color: white;
-      padding: 10px;
-      border: none;
-      cursor: pointer;
-      width: 100%;
-      margin-top: 10px;
-      border-radius:5px;
-    }
-    
-    .description-box {
-      height: 350px;
-      background: white;
-      margin-top: 10px;
-      border-radius: 35px;
-    }
-    
-    .questions {
-      margin-top: 20px;
-    }
-    
-    .questions ol {
-      list-style-type: decimal; /* Ordered list with numbers */
-      padding-left: 20px; /* Add padding to align numbers properly */
-    }
-    
-    .questions li {
-      margin: 10px 0;
-      padding: 10px;
-      background: white;
-      border-radius: 5px;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-    
-    .questions li strong {
-      font-size: 1.1rem;
-      color: #252544;
-    }
-    
-    .questions li p {
-      margin: 5px 0 0;
-      color: #666;
-    }
-    
-    /* Members Button Container */
-    .members-button-container {
-      position: absolute; /* Position the button absolutely within the right panel */
-      bottom: 10px; /* Place at the bottom */
-      right: 10px; /* Place at the right */
-    }
-    
-    /* Responsive Design */
-    @media (min-width: 768px) {
-      .content {
-        flex-direction: row;
-      }
-    
-      .left-panel {
-        flex: 2;
-        margin-right: 10px;
-        margin-bottom: 0;
-      }
-    
-      .right-panel {
-        flex: 1;
-        margin-bottom: 0;
-      }
-    
-      .post-btn,
-      .members-btn {
-        width: auto;
-      }
-    }
-    </style>
+  } catch (error) {
+    console.error("Error fetching questions:", error);
+  }
+};
+
+onMounted(() => {
+  fetchQuestions();
+  fetchGroupDetails();
+});
+
+</script>

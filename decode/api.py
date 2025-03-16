@@ -40,10 +40,9 @@ def login_user(email, password):
     try:
         # Retrieve the full user document
         user_doc = frappe.get_doc("user_reg", {"email": email})
-        
         if not user_doc:
             return {"message": "User with this email does not exist."}
-        
+
         # Hash the input password
         hashed_input_password = hashlib.sha256(password.encode()).hexdigest()
         
@@ -52,21 +51,28 @@ def login_user(email, password):
         
         # Compare hashed passwords
         if stored_password != hashed_input_password:
-            return {
-                "message": "Invalid password.",
-                "stored_password": stored_password,
-                "input_password": hashed_input_password
-            }
+            return {"message": "Invalid password."}
         
-        x = user_doc.name
-
+        # Generate a token - you can use JWT or another token generation method
+        import jwt
+        import datetime
+        
+        # Create a token with user information and expiration
+        token = jwt.encode({
+            'user': user_doc.name,
+            'email': email,
+            'exp': datetime.datetime.utcnow() + datetime.timedelta(days=1)
+        }, '275871', algorithm='HS256')  # Replace with a secure secret key
+        
+        x=user_doc.name
+        
         return {
-            "message": "Login successful!",
-            "user": user_doc.name,
-            "stored_password": stored_password,
-            "input_password": hashed_input_password
+            "message": {
+                "message": "Login successful!",
+                "token": token,
+                "user": user_doc.name
+            }
         }
-    
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Login User Error")
         return {"message": f"An error occurred: {str(e)}"}
@@ -331,8 +337,6 @@ def get_user_fullname():
     
 """Group"""
 
-import frappe
-
 @frappe.whitelist(allow_guest=True)
 def reg_group(groupname,description):
     global x
@@ -344,7 +348,7 @@ def reg_group(groupname,description):
             return {"message": "All fields are required."}
 
         # Check if the group name already exists
-        if frappe.db.exists("group", {"groupname": groupname}):
+        if frappe.db.exists("group", {"groupname": groupname, "groupowner": x}):
             return {"message": "Group name already exists."}
 
         # Create a new Group document
@@ -363,5 +367,99 @@ def reg_group(groupname,description):
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Register Group Error")
         return {"message": f"An error occurred"}
+ 
+   
+@frappe.whitelist(allow_guest=True)  # Allow public access (optional)
+def get_group_details(courseId):
+    if not courseId:
+        return {"error": _("Group ID is required")}
+    
+    # Fetch group details from the Groups Doctype - note the case sensitivity
+    # Make sure "Group" matches your actual DocType name exactly
+    group = frappe.get_value("group", courseId, ["groupname", "groupowner", "description"], as_dict=True)
+    
+    if not group:
+        return {"error": _("Group not found")}
+    
+    return group  # ✅ Return group details directly
+
+@frappe.whitelist(allow_guest=True)
+def post_question(title, description, courseId):
+    try:
+        # Check if a question with the same title AND courseId already exists
+        existing_question = frappe.db.exists("question", {"title": title, "courseid": courseId})
+
+        if existing_question:
+            return {"message": "Error: A question with this title already exists in this course."}
+
+        # Create new document in "Question" Doctype
+        question = frappe.get_doc({
+            "doctype": "question",
+            "title": title,
+            "description": description,
+            "courseid": courseId,
+        })
+        question.insert(ignore_permissions=True)  # Allow guest users to insert
+        frappe.db.commit()  
+
+        return {"message": "Question posted successfully!"}
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Post Question Error")
+        return {"message": f"Error: {str(e)}"}
+
+    
+@frappe.whitelist(allow_guest=True)
+def get_questions(courseId):
+    try:
+        # Fetch questions that match the provided course_id
+        questions = frappe.get_all(
+            "question",
+            filters={"courseid": courseId},  # Compare course_id field
+            fields=["name", "title", "description", "guide", "courseid"]
+        )
+
+        return {"questions": questions}
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Get Questions Error")
+        return {"message": f"Error: {str(e)}"}
+
+    
+@frappe.whitelist(allow_guest=True)
+def join_project(course_id):
+    global x  # Assuming x is the user ID
+
+    try:
+        # Check if the course_id exists in the "Group" Doctype (where name == course_id)
+        if not frappe.db.exists("group", {"name": course_id}):
+            return {"message": "Error: Group not found."}
+        id=x
+        
+        # Fetch the Group document using course_id
+        group = frappe.get_doc("group", course_id)
+
+        # Ensure the child table 'group_members' exists
+        if not hasattr(group, "group_members"):
+            return {"message": "Error: Child table 'group_members' not found in Group document."}
+
+        # Check if the user is already in the group_members child table
+        for member in group.group_members:
+            if member.users == id:  # 'users' field stores user IDs
+                return {"message": "User already a member of the group."}
+
+        # Append the user to the 'group_members' child table
+        group.append("group_members", {"users": id})  # Assuming 'users' field holds user IDs
+
+        # Save and commit changes
+        group.save(ignore_permissions=True)
+        frappe.db.commit()
+
+        return {"message": "Course found."}
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Join Project Error")
+        return {"message": f"Error: {str(e)}"}
+
 
 
