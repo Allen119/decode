@@ -58,6 +58,12 @@ const routes = [
     path: '/owner/:courseId',
     component: () => import('@/pages/owner.vue'),
   },
+
+  {
+    name: 'courses',
+    path: '/courses',
+    component: () => import('@/pages/courses.vue'),
+  },
 ]
 
 let router = createRouter({

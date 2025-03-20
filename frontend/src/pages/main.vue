@@ -744,6 +744,9 @@ const handleBoxClick = (box) => {
    // Toggle container visibility
    visibleContainers.value[box.id] = !visibleContainers.value[box.id]
  }
+ else if(box.id === 6){
+  router.push({ name: "courses" }); // Redirects to /courses
+ }
 }
 
 

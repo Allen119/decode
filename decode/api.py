@@ -460,6 +460,246 @@ def join_project(course_id):
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Join Project Error")
         return {"message": f"Error: {str(e)}"}
+    
+
+"""Course.vue"""
+
+@frappe.whitelist(allow_guest=True)
+def get_courses():
+    global x
+    group_owner_id = "0194dc2e-157e-77d3-ac18-0063e13e3d8c"
+
+    try:
+        # Fetch records from the "Groups" DocType where groupowner matches the given ID
+        groups = frappe.get_all("group", filters={"groupowner": x}, fields=["name", "groupname", "description", "groupowner"])
+        
+        return groups  # Returns a list of dictionaries containing all fields of the matched rows
+    except Exception as e:
+        frappe.log_error(f"Error fetching courses: {str(e)}", "get_courses")
+        return {"error": str(e)}
+
+@frappe.whitelist(allow_guest=True)
+def courses_joined():
+    global x  # Assuming x is the user ID
+    id = "0194dc2e-157e-77d3-ac18-0063e13e3d8c"
+
+    try:
+        # Query to find parent records where 'id' exists in the child table 'group_members'
+        groups = frappe.get_all(
+            "group",
+            filters=[["group_members", "users", "=", x]],  # Check in child table
+            fields=["name", "groupname", "description", "groupowner"]  # Get parent fields
+        )
+
+        if not groups:
+            return {"message": "No joined courses found."}
+
+        return groups  # Returns list of matching groups
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Courses Joined Error")
+        return {"message": f"Error: {str(e)}"}
+    
+@frappe.whitelist(allow_guest=True)
+def get_members(course_id):
+    try:
+        group = frappe.get_doc("group", course_id)
+
+        if not hasattr(group, "group_members") or not group.group_members:
+            return {"message": None}
+
+        # Extract only 'users' field from group_members
+        user_ids = [member.users for member in group.group_members]
+
+        if not user_ids:
+            return {"message": None}
+
+        # Query user_reg to get fullnames for matching user_ids
+        user_fullnames = frappe.get_all(
+            "user_reg",
+            filters=[["name", "in", user_ids]],
+            fields=["fullname"]
+        )
+
+        # Extract fullnames from the query result
+        fullnames_list = [user["fullname"] for user in user_fullnames]
+
+        return {"message": fullnames_list}  # Returns only the list of full names
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Get Members Error")
+        return {"message": f"Error: {str(e)}"}
+    
+@frappe.whitelist(allow_guest=True)
+def get_question_details(question_name, courseId):
+    try:
+        # Query to get the question document where title matches question_name and CourseId matches
+        question = frappe.db.get_value("question", {"title": question_name, "courseid": courseId}, ["name", "title", "description"], as_dict=True)
+
+        if not question:
+            return {"message": "No matching question found for the given title and CourseId."}
+
+        # Return the necessary fields
+        return {
+            "name": question.get("name"),
+            "title": question.get("title"),
+            "description": question.get("description")
+        }
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Question Details Error")
+        return {"message": f"Error: {str(e)}"}
+
+
+@frappe.whitelist(allow_guest=True)
+def createfile(questionTitle, courseId, filename, language):
+    global x  # Using the global variable 'x' as the user
+    # x = "0194dc2e-157e-77d3-ac18-0063e13e3d8c"
+
+    try:
+        if not (questionTitle and courseId and filename and language):
+            return {"status": "error", "message": "Missing required parameters."}
+
+        # Fetch the parent Question document
+        question_name = frappe.get_value(
+            "question",  # Ensure this is the correct parent Doctype name
+            {"title": questionTitle, "courseid": courseId},
+            "name"
+        )
+
+        if not question_name:
+            return {"status": "error", "message": "No matching question found for the given title and courseId."}
+
+        # Get the Question document
+        question_doc = frappe.get_doc("question", question_name)
+
+        # Check if the user already has an answer for this question
+        existing_answer = next(
+            (ans for ans in question_doc.answer if ans.user == x), None
+        )
+
+        if existing_answer:
+            return {
+                "status": "error",
+                "message": "You have already created a file for this question.",
+                "filename": existing_answer.filename
+            }
+
+        # Append new entry to the Answer child table
+        question_doc.append("answer", {
+            "user": x,
+            "filename": filename,
+            "language": language
+        })
+
+        # Save the updated Question document
+        question_doc.save(ignore_permissions=True)
+        frappe.db.commit()
+
+        return {
+            "status": "success",
+            "message": "Answer added successfully.",
+            "data": {
+                "name": question_doc.name,
+                "user": x,
+                "filename": filename,
+                "language": language
+            }
+        }
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Create Answer API Error")
+        return {"status": "error", "message": f"Internal Server Error: {str(e)}"}
+
+
+@frappe.whitelist(allow_guest=True)
+def check_existing_file(questionTitle, courseId):
+    global x
+    try:
+        # Check if the Question exists
+        question_name = frappe.get_value(
+            "question",
+            {"title": questionTitle, "courseid": courseId},
+            "name"
+        )
+
+        if not question_name:
+            return {"status": "error", "message": "No matching question found."}
+
+        # Check if an answer already exists for the user
+        existing_file = frappe.db.get_value(
+            "answer",
+            {"parent": question_name, "user": x},
+            "filename"
+        )
+
+        if existing_file:
+            return {"status": "exists", "filename": existing_file}
+
+        return {"status": "not_found"}
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Check File API Error")
+        return {"status": "error", "message": f"Internal Server Error: {str(e)}"}
+    
+@frappe.whitelist(allow_guest=True)
+def getTitleDetails(questionTitle, courseId):
+    try:
+        # Fetch the Question document name (parent Doctype)
+        question_name = frappe.get_value(
+            "question",
+            {"title": questionTitle, "courseid": courseId},
+            "name"
+        )
+
+        if not question_name:
+            return {"status": "error", "message": "No matching question found."}
+
+        # Fetch details of the parent Question document
+        question_doc = frappe.get_doc("question", question_name)
+
+        # Extract required fields from Question (Parent)
+        question_details = {
+            "name": question_doc.name,
+            "title": question_doc.title,
+            "courseid": question_doc.courseid,
+            "description": question_doc.description,
+        }
+
+        # Fetch corresponding Answer (Child Table) details where parent matches and submitt = 1
+        answers = frappe.get_all(
+            "answer",  
+            filters={"parent": question_name, "submitt": 1},  
+            fields=["name", "user"]  
+        )
+
+        # Extract user IDs from answers
+        user_ids = [answer["user"] for answer in answers]
+
+        # Fetch full names of the users from `user_reg`
+        user_fullnames = {}
+        if user_ids:
+            user_records = frappe.get_all(
+                "user_reg", 
+                filters={"name": ["in", user_ids]}, 
+                fields=["name", "fullname"]
+            )
+            user_fullnames = {user["name"]: user["fullname"] for user in user_records}
+
+        # Attach only fullname and name to the answers list
+        formatted_answers = [
+            {"filename": answer["name"], "fullname": user_fullnames.get(answer["user"], "Unknown User")}
+            for answer in answers
+        ]
+
+        return {
+            "status": "success",
+            "question": question_details,
+            "answers": formatted_answers  
+        }
+
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 
 
