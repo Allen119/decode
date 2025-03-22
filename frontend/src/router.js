@@ -64,6 +64,12 @@ const routes = [
     path: '/courses',
     component: () => import('@/pages/courses.vue'),
   },
+
+  {
+    name: 'filecode1',
+    path: '/filecode1/:uuid', 
+    component: () => import('@/pages/filecode1.vue'), 
+  }
 ]
 
 let router = createRouter({

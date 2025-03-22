@@ -79,22 +79,26 @@
 
             <!-- Input Box and Create Button -->
             <div class="mt-4 flex items-center gap-2">
-                <!-- Show filename if it exists -->
-                <div v-if="existingFile" class="p-2 bg-gray-200 text-black rounded-md">
-                    {{ existingFile }}
-                </div>
+  <!-- Clickable filename if it exists -->
+  <div 
+    v-if="existingFile" 
+    @click="navigateToFile(existingFileName)" 
+    class="p-2 bg-gray-200 text-black rounded-md cursor-pointer hover:bg-gray-300 transition">
+    {{ existingFile }}
+  </div>
 
-                <!-- Show input and button if no file exists -->
-                <div v-else class="flex gap-2">
-                    <input v-model="newInput" type="text" placeholder=".py..."
-                        class="border rounded-md p-2 flex-1 bg-gray-100 text-black outline-none focus:ring focus:ring-[#D9D9D9]">
+  <!-- Show input and button if no file exists -->
+  <div v-else class="flex gap-2">
+    <input v-model="newInput" type="text" placeholder=".py..."
+      class="border rounded-md p-2 flex-1 bg-gray-100 text-black outline-none focus:ring focus:ring-[#D9D9D9]">
 
-                    <button @click="handleCreate(selectedQuestionTitle)"
-                        class="bg-[rgba(40,41,71,1)] text-white px-4 py-2 rounded-md hover:bg-[#797a9c] transition">
-                        Create
-                    </button>
-                </div>
-            </div>
+    <button @click="handleCreate(selectedQuestionTitle)"
+      class="bg-[rgba(40,41,71,1)] text-white px-4 py-2 rounded-md hover:bg-[#797a9c] transition">
+      Create
+    </button>
+  </div>
+</div>
+
         </div>
 
 
@@ -104,7 +108,9 @@
 <script setup>
 import { useRoute } from 'vue-router';
 import { ref, watch, onMounted } from "vue";
+import { useRouter } from 'vue-router';
 
+const router = useRouter();
 const route = useRoute();
 const courseId = ref(route.params.courseId);
 const groupDetails = ref({
@@ -219,11 +225,21 @@ const handleCreate = async (questionTitle) => {
 
         const data = await response.json();
         console.log("Response from backend:", data);
+
+        // ✅ Redirect using 'name' from the API response
+        if (data.message.status === "success" && data.message.data?.name) {
+            navigateToFile(data.message.data.name);
+        } else {
+            console.error("Error: 'name' not found in API response");
+        }
     } catch (error) {
         console.error("Error sending request:", error);
     }
 };
+
+
 const existingFile = ref(null);
+const existingFileName = ref(null); // Store the name field
 
 const checkExistingFile = async () => {
   if (!selectedQuestionTitle.value || !courseId.value) return;
@@ -236,16 +252,24 @@ const checkExistingFile = async () => {
     const data = await response.json();
     console.log("File check response:", data);
     
-    // Correct access to the nested structure
     if (data.message && data.message.status === "exists") {
-      existingFile.value = data.message.filename;
+      existingFile.value = data.message.filename;  // Store filename
+      existingFileName.value = data.message.name;  // Store UUID
     } else {
       existingFile.value = null;
+      existingFileName.value = null;
     }
   } catch (error) {
     console.error("Error checking file:", error);
   }
 };
+
+const navigateToFile = (filename) => {
+  if (filename) {
+    router.push({ name: "filecode1", params: { uuid: filename } });
+  }
+};
+
 
 // Run check when questionTitle changes
 watch(selectedQuestion, (newVal) => {

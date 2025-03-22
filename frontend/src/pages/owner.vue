@@ -66,45 +66,16 @@
         <h3 class="absolute text-lg text-black font-light left-[3%] top-[5%]">Questions</h3>
         <!-- List of questions - making this container scrollable while keeping the header fixed -->
         <div class="absolute left-[3%] top-[12%] w-[93%] h-[80%] overflow-y-auto pr-4">
-    <ul class="text-lg text-black font-light">
-      <li v-for="(question, index) in questions" :key="question.name"
-        @click="fetchQuestionDetails(question.title, question.courseid)" 
-        class="mb-2 cursor-pointer hover:text-blue-500 transition">
-        {{ index + 1 }}. {{ question.title }}
-      </li>
-    </ul>
-  </div>
+          <ul class="text-lg text-black font-light">
+            <li v-for="(question, index) in questions" :key="question.name"
+              @click="fetchQuestionDetails(question.title, question.courseid)"
+              class="mb-2 cursor-pointer hover:text-blue-500 transition">
+              {{ index + 1 }}. {{ question.title }}
+            </li>
+          </ul>
+        </div>
 
-  <!-- Question Details Container -->
-  <div v-if="selectedQuestion" class="absolute top-[9.9%] left-[1%] w-[52%] h-[87%] p-6 border bg-white text-black z-50 shadow-lg">
-  <!-- Close Button (Cross Symbol) -->
-  <button @click="selectedQuestion = null"
-    class="absolute top-2 right-2 bg-gray-200 text-black rounded-full w-8 h-8 flex items-center justify-center hover:bg-gray-300 transition">
-    ✕
-  </button>
 
-  <!-- Title Section -->
-  <h3 class="text-xl font-light mb-2">Title</h3>
-  <div class="border rounded-md p-3 bg-gray-100 text-black ">
-    {{ selectedQuestion.title }}
-  </div>
-
-  <!-- Description Section -->
-  <h3 class="text-xl font-light mt-4 mb-2">Description</h3>
-  <div class="border rounded-md p-3 bg-gray-100 text-black h-[40%] font-light overflow-y-auto break-words whitespace-normal">
-    <div v-html="selectedQuestion.description"></div>
-  </div>
-
-  <!-- Submitted Users Section -->
-  <h3 class="text-xl font-light mt-4 mb-2">Submitted Users</h3>
-  <div class="border rounded-md p-3 bg-gray-100 text-black font-light h-[20%] overflow-y-auto">
-    <ul class="list-disc ml-6">
-      <li v-for="answer in submittedUsers" :key="answer.name" class="text-gray-600">
-        {{ answer.fullname }}
-      </li>
-    </ul>
-  </div>
-</div>
 
 
       </div>
@@ -135,12 +106,71 @@
       </ul>
       <p v-else class="text-gray-500">No members found</p>
     </div>
+
+    <!-- Question Details Container -->
+    <div v-if="selectedQuestion" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-30 z-[999]">
+      <div class="relative w-[60%] max-h-[90vh] p-6 border bg-white text-black shadow-lg rounded-lg overflow-y-auto">
+        <!-- Close Button (Cross Symbol) -->
+        <button @click="selectedQuestion = null"
+          class="absolute top-2 right-2 bg-gray-200 text-black rounded-full w-8 h-8 flex items-center justify-center hover:bg-gray-300 transition">
+          ✕
+        </button>
+
+        <!-- Title Section -->
+        <h3 class="text-xl font-light mb-2">Title</h3>
+        <div class="border rounded-md p-3 bg-gray-100 text-black">
+          {{ selectedQuestion.title }}
+        </div>
+
+        <!-- Description Section -->
+        <h3 class="text-xl font-light mt-4 mb-2">Description</h3>
+        <div
+          class="border rounded-md p-3 bg-gray-100 text-black font-light overflow-y-auto break-words whitespace-normal max-h-[40vh]">
+          <div v-html="selectedQuestion.description"></div>
+        </div>
+
+        <!-- Submitted Users Section -->
+        <h3 class="text-xl font-light mt-4 mb-2">Submitted Users</h3>
+        <div class="border rounded-md p-3 bg-gray-100 text-black font-light overflow-y-auto max-h-[20vh]">
+          <ul class="list-disc ml-6">
+            <li v-for="answer in submittedUsers" :key="answer.filename"
+              class="text-gray-600 flex justify-between items-center">
+              <!-- Clicking the name triggers navigation -->
+              <span @click="navigateToFile(answer.filename)" class="cursor-pointer hover:text-blue-500">
+                {{ answer.fullname }}
+              </span>
+
+              <!-- Checkbox remains functional without triggering navigation -->
+              <input type="checkbox"
+                class="h-4 w-4 text-[rgba(40,41,71,1)] outline-none focus:ring-0 focus:ring-offset-0"
+                :checked="answer.corrected === 1" @change="toggleCorrection(answer)">
+            </li>
+          </ul>
+        </div>
+
+        <!-- Unsubmitted Users Section -->
+        <h3 class="text-xl font-light mt-4 mb-2">Unsubmitted Users</h3>
+        <div class="border rounded-md p-3 bg-gray-100 text-black font-light overflow-y-auto max-h-[20vh]">
+          <ul class="ml-6">
+            <li v-for="user in unsubmittedUsers" :key="user.filename" class="text-gray-600">
+              <span @click="navigateToFile(user.filename)" class="cursor-pointer hover:text-blue-500">
+                {{ user.fullname }}
+              </span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
 <script setup>
 import { useRoute } from 'vue-router';
 import { ref, onMounted } from "vue";
+import { useRouter } from 'vue-router';
+
+const router = useRouter();
 
 const route = useRoute();
 const courseId = ref(route.params.courseId);
@@ -260,6 +290,7 @@ const toggleMembers = () => {
 
 const selectedQuestion = ref(null); // Stores selected question details
 const submittedUsers = ref([]); // Stores list of submitted users
+const unsubmittedUsers = ref([]); // Stores list of unsubmitted users
 
 const fetchQuestionDetails = async (questionTitle) => {
   if (!questionTitle || !courseId.value) return;
@@ -271,20 +302,62 @@ const fetchQuestionDetails = async (questionTitle) => {
     const data = await response.json();
     console.log("Question Details:", data);
 
-    if (data.message.status === "success") {
-      // ✅ Correctly set the question details
-      selectedQuestion.value = data.message.question;
+    if (data.message?.status === "success") {
+      // ✅ Assigning question details properly
+      selectedQuestion.value = {
+        title: data.message.question.title,
+        description: data.message.question.description
+      };
 
-      // ✅ Correctly store submitted users
-      submittedUsers.value = data.message.answers || [];
+      // ✅ Assigning submitted and unsubmitted users correctly
+      submittedUsers.value = data.message.submitted_answers || [];
+      unsubmittedUsers.value = data.message.unsubmitted_answers || [];
 
       console.log("Selected Question:", selectedQuestion.value);
       console.log("Submitted Users:", submittedUsers.value);
+      console.log("Unsubmitted Users:", unsubmittedUsers.value);
     } else {
       console.error("Error:", data.message);
     }
   } catch (error) {
     console.error("Error fetching question details:", error);
+  }
+};
+
+
+
+const toggleCorrection = async (answer) => {
+  // Toggle the corrected value
+  answer.corrected = answer.corrected === 1 ? 0 : 1;
+
+  try {
+    const response = await fetch("http://decode.local:8080/api/method/decode.api.updateCorrection", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        answer_id: answer.filename, // Assuming filename is the unique identifier
+        corrected: answer.corrected, // New value after toggling
+      }),
+    });
+
+    const data = await response.json();
+
+    // Access the nested status in the message object
+    if (data.message && data.message.status === "success") {
+      console.log("Correction updated successfully!");
+    } else {
+      console.error("Error updating correction:", data.message?.message || "Unknown error");
+    }
+  } catch (error) {
+    console.error("Network error:", error);
+  }
+};
+
+const navigateToFile = (filename) => {
+  if (filename) {
+    router.push({ name: 'filecode1', params: { uuid: filename } });
   }
 };
 

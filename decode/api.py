@@ -269,28 +269,50 @@ def save_code_to_database(file_uuid, code):
         }
     }
 
-
 import subprocess
 @frappe.whitelist(allow_guest=True)
-def execute(code):
+def execute(code, user_input=None):
     try:
         frappe.logger().info(f"Executing Code:\n{code}")
-
-        result = subprocess.run(
+        
+        # Split input by commas
+        input_lines = user_input.split(",") if user_input else []
+        input_data = "\n".join(input_lines) + "\n" if input_lines else ""
+        
+        # Run the Python script as a subprocess
+        process = subprocess.Popen(
             ["python3", "-c", code],
-            capture_output=True,
-            text=True,
-            timeout=5
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
         )
-
-        output = result.stdout
-        error = result.stderr
-
-        frappe.logger().info(f"Execution Output:\n{output}")
-        frappe.logger().info(f"Execution Error:\n{error}")
-
-        return {"output": output, "error": error}
-
+        
+        # Pass input to the script
+        output, error = process.communicate(input=input_data, timeout=5)
+        
+        # Process the output to remove input prompts that were already shown
+        processed_output = output.strip()
+        
+        # Extract input prompts from code
+        import re
+        input_prompts = re.findall(r'input\([\'"](.+?)[\'"]\)', code)
+        
+        # Remove input prompts from output
+        for prompt in input_prompts:
+            processed_output = processed_output.replace(prompt, '', 1)
+        
+        # Clean up input artifacts
+        processed_output = re.sub(r'\s*\n\s*\n', '\n', processed_output)
+        
+        frappe.logger().info(f"Processed Output:\n{processed_output}")
+        frappe.logger().info(f"Error:\n{error}")
+        
+        return {
+            "output": processed_output,
+            "raw_output": output.strip(),  # Original output for debugging
+            "error": error.strip()
+        }
     except subprocess.TimeoutExpired:
         frappe.logger().error("Execution timed out.")
         return {"error": "Execution timed out."}
@@ -298,8 +320,6 @@ def execute(code):
         frappe.logger().error(f"Execution failed: {str(e)}")
         return {"error": str(e)}
     
-    
-
 @frappe.whitelist(allow_guest=True)
 def findbyuuid(uuid):
     # Get all user_reg documents
@@ -551,10 +571,11 @@ def get_question_details(question_name, courseId):
         return {"message": f"Error: {str(e)}"}
 
 
+import frappe
+
 @frappe.whitelist(allow_guest=True)
 def createfile(questionTitle, courseId, filename, language):
     global x  # Using the global variable 'x' as the user
-    # x = "0194dc2e-157e-77d3-ac18-0063e13e3d8c"
 
     try:
         if not (questionTitle and courseId and filename and language):
@@ -586,7 +607,7 @@ def createfile(questionTitle, courseId, filename, language):
             }
 
         # Append new entry to the Answer child table
-        question_doc.append("answer", {
+        new_answer = question_doc.append("answer", {
             "user": x,
             "filename": filename,
             "language": language
@@ -596,11 +617,12 @@ def createfile(questionTitle, courseId, filename, language):
         question_doc.save(ignore_permissions=True)
         frappe.db.commit()
 
+        # Return the generated name from the newly created entry
         return {
             "status": "success",
             "message": "Answer added successfully.",
             "data": {
-                "name": question_doc.name,
+                "name": new_answer.name,  # Auto-generated `name` field
                 "user": x,
                 "filename": filename,
                 "language": language
@@ -630,11 +652,16 @@ def check_existing_file(questionTitle, courseId):
         existing_file = frappe.db.get_value(
             "answer",
             {"parent": question_name, "user": x},
-            "filename"
+            ["filename", "name"],  # Fetch both filename and name
+            as_dict=True  # Return as dictionary
         )
 
         if existing_file:
-            return {"status": "exists", "filename": existing_file}
+            return {
+        "status": "exists",
+        "filename": existing_file.get("filename"),  # Extract values correctly
+        "name": existing_file.get("name")  # Include the generated name field
+        }
 
         return {"status": "not_found"}
 
@@ -651,13 +678,12 @@ def getTitleDetails(questionTitle, courseId):
             {"title": questionTitle, "courseid": courseId},
             "name"
         )
-
         if not question_name:
             return {"status": "error", "message": "No matching question found."}
-
+        
         # Fetch details of the parent Question document
         question_doc = frappe.get_doc("question", question_name)
-
+        
         # Extract required fields from Question (Parent)
         question_details = {
             "name": question_doc.name,
@@ -665,41 +691,128 @@ def getTitleDetails(questionTitle, courseId):
             "courseid": question_doc.courseid,
             "description": question_doc.description,
         }
-
-        # Fetch corresponding Answer (Child Table) details where parent matches and submitt = 1
-        answers = frappe.get_all(
-            "answer",  
-            filters={"parent": question_name, "submitt": 1},  
-            fields=["name", "user"]  
+        
+        # Fetch all submitted answers (submitt = 1)
+        submitted_answers = frappe.get_all(
+            "answer",
+            filters={"parent": question_name, "submitt": 1},
+            fields=["name", "user", "corrected"]
         )
-
-        # Extract user IDs from answers
-        user_ids = [answer["user"] for answer in answers]
-
+        
+        # Fetch all unsubmitted answers (submitt = 0)
+        unsubmitted_answers = frappe.get_all(
+            "answer",
+            filters={"parent": question_name, "submitt": "0" or 0},
+            fields=["name", "user"]
+        )
+        
+        # Extract user IDs from both submitted and unsubmitted answers
+        user_ids = list(set([answer["user"] for answer in submitted_answers + unsubmitted_answers]))
+        
         # Fetch full names of the users from `user_reg`
         user_fullnames = {}
         if user_ids:
             user_records = frappe.get_all(
-                "user_reg", 
-                filters={"name": ["in", user_ids]}, 
+                "user_reg",
+                filters={"name": ["in", user_ids]},
                 fields=["name", "fullname"]
             )
             user_fullnames = {user["name"]: user["fullname"] for user in user_records}
-
-        # Attach only fullname and name to the answers list
-        formatted_answers = [
-            {"filename": answer["name"], "fullname": user_fullnames.get(answer["user"], "Unknown User")}
-            for answer in answers
+        
+        # Format submitted answers with required fields
+        formatted_submitted_answers = [
+            {
+                "filename": answer["name"],
+                "fullname": user_fullnames.get(answer["user"], "Unknown User"),
+                "corrected": int(answer.get("corrected", 0))
+            }
+            for answer in submitted_answers
         ]
-
+        
+        # Format unsubmitted answers with required fields
+        formatted_unsubmitted_answers = [
+            {
+                "filename": answer["name"],
+                "fullname": user_fullnames.get(answer["user"], "Unknown User")
+            }
+            for answer in unsubmitted_answers
+        ]
+        
         return {
             "status": "success",
             "question": question_details,
-            "answers": formatted_answers  
+            "submitted_answers": formatted_submitted_answers,
+            "unsubmitted_answers": formatted_unsubmitted_answers
         }
-
+    
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+
+@frappe.whitelist(allow_guest=True)
+def updateCorrection(answer_id, corrected):
+    try:
+        # Ensure corrected is stored as an integer (1 or 0)
+        corrected = int(corrected)
+
+        # Update the 'corrected' field for the given answer
+        frappe.db.set_value("answer", answer_id, "corrected", corrected)
+        frappe.db.commit()
+
+        return {"status": "success", "message": "Correction updated successfully!"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@frappe.whitelist(allow_guest=True)
+def getFileName(search_fileid):
+    if not search_fileid:
+        return {"error": "Missing search_fileid parameter"}
+    try:
+        file_doc = frappe.db.get_value(
+            "answer",
+            {"name": search_fileid}, ["filename", "code", "submitt","corrected"])
+        
+        if file_doc:
+            return {"filename": file_doc[0], "code": file_doc[1], "submitted": file_doc[2], "corrected": file_doc[3]}
+        else:
+            return {"error": "File not found"}
+    except Exception as e:
+        frappe.log_error(f"Error fetching file name: {str(e)}", "API Error")
+        return {"error": "Internal Server Error"}
+    
+@frappe.whitelist(allow_guest=True)
+def saveFileCode(file_id, code):
+    if not file_id:
+        return {"error": "Missing file_id parameter"}
+    
+    try:
+        frappe.db.set_value("answer", file_id, "code", code)
+        frappe.db.commit()
+        return {"message": "Code updated successfully"}
+    except Exception as e:
+        frappe.log_error(f"Error saving code: {str(e)}", "API Error")
+        return {"error": "Internal Server Error"}
+
+@frappe.whitelist(allow_guest=True)
+def toggleSubmit(file_id, submitt):
+    if not file_id:
+        return {"error": "Missing file_id parameter"}
+    try:
+        # Check if the file is already corrected
+        corrected = frappe.db.get_value("answer", file_id, "corrected")
+        
+        # Convert to integers for comparison
+        corrected = int(corrected) if corrected is not None else 0
+        
+        if corrected == 1:
+            return {"error": "Already corrected"}
+            
+        # Only update if not corrected
+        frappe.db.set_value("answer", file_id, "submitt", int(submitt))
+        frappe.db.commit()
+        return {"message": "Submission status updated", "submitt": int(submitt)}
+    except Exception as e:
+        frappe.log_error(f"Error updating submit status: {str(e)}", "API Error")
+        return {"error": "Internal Server Error"}
 
 
