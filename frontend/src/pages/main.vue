@@ -113,9 +113,9 @@
       @click="toggleJoinContainer"
     />
 
-  <p class="text-[20px] font-bold mt-4 mb-4 transform translate-y-[100px] translate-x-[-579%]">
+  <!-- <p class="text-[20px] font-bold mt-4 mb-4 transform translate-y-[100px] translate-x-[-579%]">
     Recent files
-  </p>
+  </p> -->
 
   <div v-if="visibleContainers[7]" 
       class="new-container absolute top-20 left-15 w-[450px] h-[80px] bg-[rgba(217,217,217,1)] rounded-md shadow-lg flex items-center justify-center z-50 transform translate-y-[300%]">
@@ -138,7 +138,28 @@
     </div>
  </div>
 
-      <!-- Boxes -->
+  <!-- New Container for box.id === 9 -->
+  <div
+      v-if="visibleContainers[9]"
+      class="new-container absolute top-[10%] left-15 w-[25%] h-[45%] bg-white rounded-[25px] p-4 overflow-y-auto"
+    >
+      <h2 class="text-black text-lg font-semibold mb-2">Your Files</h2>
+
+      <ul v-if="codingFiles.length > 0">
+        <li
+          v-for="file in codingFiles"
+          :key="file.name"
+          class="text-black p-2 cursor-pointer hover:bg-gray-800 rounded-md"
+          @click="navigateToFile(file.name)"
+        >
+          {{ file.filename }}
+        </li>
+      </ul>
+
+      <p v-else class="text-gray-400">No files found.</p>
+    </div>
+
+      <!-- Boxes
       <div v-for="(box, index) in recentbox" :key="box.id" :id="`box-${box.id}`" :data-index="index"
         class="w-full flex items-center px-4 cursor-pointer" :style="{
           top: '5%',
@@ -157,7 +178,15 @@
         <p class="font-light text-black mx-auto" :style="box.textStyle">
           {{ box.name }}
         </p>
-      </div>
+      </div> -->
+      <button @click="handleLogout"
+  class="absolute top-[85%] right-12 bg-[rgba(40,41,71,1)] text-white font-bold rounded-[7px] hover:opacity-90 focus:outline-none w-36 h-12 flex items-center justify-center transform translate-y-[10px]">
+  <div class="flex items-center space-x-2">
+    <span>Logout</span>
+  </div>
+</button>
+
+      
     </div>
 
     <!-- Button to toggle container (Outside main content area) -->
@@ -336,7 +365,7 @@ const boxes = ref([
     textStyle: { transform: 'translateX(-6px)' }
   },
   {
-    id: 4,
+    id: 9,
     name: 'Files',
     logo: files,
     height: '4%',
@@ -687,6 +716,7 @@ const joinProject = async () => {
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
   fetchUserFullname()
+  onMounted(fetchCodingFiles);
 })
 
 onUnmounted(() => {
@@ -747,8 +777,39 @@ const handleBoxClick = (box) => {
  else if(box.id === 6){
   router.push({ name: "courses" }); // Redirects to /courses
  }
-}
+ else if (box.id === 9) {
+    visibleContainers.value[box.id] = !visibleContainers.value[box.id];
+    if (visibleContainers.value[box.id]) {
+      fetchCodingFiles(); // Fetch data when the container opens
+    }
+  }
+};
 
+const codingFiles = ref([]); // ✅ Ensure codingFiles is initialized
+
+const fetchCodingFiles = async () => {
+  try {
+    const response = await fetch("http://decode.local:8080/api/method/decode.api.get_coding_files");
+    const responseData = await response.json();
+    console.log("Response received:", responseData);
+    
+    // Access the actual data structure through message property
+    if (responseData.message && responseData.message.status === "success") {
+      codingFiles.value = responseData.message.data; // Access data through message
+      console.log("codingFiles after update:", codingFiles.value);
+    } else {
+      console.error("Error fetching files:", responseData.message ? responseData.message.message : "Unknown error");
+    }
+  } catch (error) {
+    console.error("API Error:", error);
+  }
+};
+
+const navigateToFile = (filename) => {
+      if (filename) {
+        router.push({ name: "filecode", params: { uuid: filename } });
+      }
+    };
 
 const lastFileUuid = ref(""); // Store UUID from input
 const errorMessage = ref(""); // Store error message
@@ -789,6 +850,26 @@ const enterfile = async () => {
   }
 };
 
+const handleLogout = async () => {
+  try {
+    // Call backend to set x = None
+    const response = await fetch("http://decode.local:8080/api/method/decode.api.logout", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    // Parse JSON response
+    const data = await response.json();
+    console.log("Server Response:", data); // ✅ Print server response
+
+    // Redirect to /signin
+    router.push("/signin");
+  } catch (error) {
+    console.error("Logout failed:", error);
+  }
+};
 
 </script>
 

@@ -79,25 +79,23 @@
 
             <!-- Input Box and Create Button -->
             <div class="mt-4 flex items-center gap-2">
-  <!-- Clickable filename if it exists -->
-  <div 
-    v-if="existingFile" 
-    @click="navigateToFile(existingFileName)" 
-    class="p-2 bg-gray-200 text-black rounded-md cursor-pointer hover:bg-gray-300 transition">
-    {{ existingFile }}
-  </div>
+                <!-- Clickable filename if it exists -->
+                <div v-if="existingFile" @click="navigateToFile(existingFileName)"
+                    class="p-2 bg-gray-200 text-black rounded-md cursor-pointer hover:bg-gray-300 transition">
+                    {{ existingFile }}
+                </div>
 
-  <!-- Show input and button if no file exists -->
-  <div v-else class="flex gap-2">
-    <input v-model="newInput" type="text" placeholder=".py..."
-      class="border rounded-md p-2 flex-1 bg-gray-100 text-black outline-none focus:ring focus:ring-[#D9D9D9]">
+                <!-- Show input and button if no file exists -->
+                <div v-else class="flex gap-2">
+                    <input v-model="newInput" type="text" placeholder=".py..."
+                        class="border rounded-md p-2 flex-1 bg-gray-100 text-black outline-none focus:ring focus:ring-[#D9D9D9]">
 
-    <button @click="handleCreate(selectedQuestionTitle)"
-      class="bg-[rgba(40,41,71,1)] text-white px-4 py-2 rounded-md hover:bg-[#797a9c] transition">
-      Create
-    </button>
-  </div>
-</div>
+                    <button @click="handleCreate(selectedQuestionTitle)"
+                        class="bg-[rgba(40,41,71,1)] text-white px-4 py-2 rounded-md hover:bg-[#797a9c] transition">
+                        Create
+                    </button>
+                </div>
+            </div>
 
         </div>
 
@@ -188,7 +186,7 @@ const fetchQuestionDetails = async (questionTitle) => {
 };
 const closeModal = () => {
     selectedQuestion.value = null;
-     // Hide the modal
+    // Hide the modal
 };
 
 const newInput = ref("");
@@ -242,32 +240,32 @@ const existingFile = ref(null);
 const existingFileName = ref(null); // Store the name field
 
 const checkExistingFile = async () => {
-  if (!selectedQuestionTitle.value || !courseId.value) return;
-  
-  try {
-    const response = await fetch(
-      `http://decode.local:8080/api/method/decode.api.check_existing_file?questionTitle=${encodeURIComponent(selectedQuestionTitle.value)}&courseId=${courseId.value}`
-    );
-    
-    const data = await response.json();
-    console.log("File check response:", data);
-    
-    if (data.message && data.message.status === "exists") {
-      existingFile.value = data.message.filename;  // Store filename
-      existingFileName.value = data.message.name;  // Store UUID
-    } else {
-      existingFile.value = null;
-      existingFileName.value = null;
+    if (!selectedQuestionTitle.value || !courseId.value) return;
+
+    try {
+        const response = await fetch(
+            `http://decode.local:8080/api/method/decode.api.check_existing_file?questionTitle=${encodeURIComponent(selectedQuestionTitle.value)}&courseId=${courseId.value}`
+        );
+
+        const data = await response.json();
+        console.log("File check response:", data);
+
+        if (data.message && data.message.status === "exists") {
+            existingFile.value = data.message.filename;  // Store filename
+            existingFileName.value = data.message.name;  // Store UUID
+        } else {
+            existingFile.value = null;
+            existingFileName.value = null;
+        }
+    } catch (error) {
+        console.error("Error checking file:", error);
     }
-  } catch (error) {
-    console.error("Error checking file:", error);
-  }
 };
 
 const navigateToFile = (filename) => {
-  if (filename) {
-    router.push({ name: "filecode1", params: { uuid: filename } });
-  }
+    if (filename) {
+        router.push({ name: "filecode1", params: { uuid: filename } });
+    }
 };
 
 

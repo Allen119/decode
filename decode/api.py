@@ -815,4 +815,39 @@ def toggleSubmit(file_id, submitt):
         frappe.log_error(f"Error updating submit status: {str(e)}", "API Error")
         return {"error": "Internal Server Error"}
 
+@frappe.whitelist(allow_guest=True)
+def get_coding_files():
+    global x  # Assuming 'x' holds the current user's ID
+    
+    try:
+        # Fetch the user document from 'user_reg' based on 'x'
+        user = frappe.get_doc("user_reg", x)
+
+        # Check if the user has the 'codingfiles' child table
+        if not hasattr(user, "codingfiles"):
+            return {"status": "error", "message": "Child table 'codingfiles' not found for the user."}
+
+        # Extract the list of filenames and their corresponding name fields
+        coding_files = [{"filename": file.filename, "name": file.name} for file in user.codingfiles]
+
+        return {
+            "status": "success",
+            "message": "Files retrieved successfully.",
+            "data": coding_files  # Return the list of coding files
+        }
+
+    except frappe.DoesNotExistError:
+        return {"status": "error", "message": f"User with ID {x} does not exist."}
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Get Coding Files Error")
+        return {"status": "error", "message": f"An error occurred: {str(e)}"}
+    
+@frappe.whitelist(allow_guest=True)
+def logout():
+    global x  # Reference the global variable
+    x = None  # Set global x to None
+    frappe.cache().set_value("x", None)  # Store x as None in cache
+    return {"status": "success", "message": "Logged out successfully", "Value": x}
+
 
