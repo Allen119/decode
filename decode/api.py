@@ -862,4 +862,66 @@ def deleteques(name):
     except Exception as e:
         return {"error": str(e)}
 
+@frappe.whitelist(allow_guest=True)
+def post_message(course_id, message_text):
+    if not message_text.strip():
+        return {"error": "Message cannot be empty."}
 
+    new_message = frappe.get_doc({
+        "doctype": "message",
+        "courseid": course_id,
+        "message_text": message_text,
+        "sent_at": frappe.utils.now_datetime()  # Stores current timestamp
+    })
+    new_message.insert(ignore_permissions=True)
+    frappe.db.commit()
+
+    return {"success": True, "message": "Message stored successfully"}
+
+
+import frappe
+from datetime import datetime, timedelta
+import pytz  # Import for handling timezones
+
+# Define Kolkata timezone
+kolkata_tz = pytz.timezone("Asia/Kolkata")
+
+@frappe.whitelist(allow_guest=True)
+def get_messages(course_id):
+    # Fetch current time in Kolkata timezone
+    current_time = datetime.now(kolkata_tz)
+
+    messages = frappe.get_all(
+        "message",
+        filters={"courseid": course_id},
+        fields=["name", "message_text", "sent_at"],
+        order_by="sent_at desc"
+    )
+
+    for msg in messages:
+        msg["time_ago"] = format_time_ago(msg["sent_at"], current_time)
+
+    return {"success": True, "messages": messages}  # ✅ Return without extra nesting
+
+def format_time_ago(sent_at, current_time):
+    # Convert sent_at if it's a string
+    if isinstance(sent_at, str):
+        sent_at = datetime.strptime(sent_at, "%Y-%m-%d %H:%M:%S.%f")
+        sent_at = kolkata_tz.localize(sent_at)
+
+    # Calculate time difference in seconds
+    time_diff = (current_time - sent_at).total_seconds()
+
+    # Format time ago string
+    if time_diff < 60:
+        return "Just now"
+    elif time_diff < 3600:
+        return f"{int(time_diff // 60)} minutes ago"
+    elif sent_at.date() == current_time.date():
+        return f"{int(time_diff // 3600)} hours ago"
+    elif sent_at.date() == (current_time - timedelta(days=1)).date():
+        return "Yesterday"
+    elif time_diff < 7 * 86400:
+        return f"{int(time_diff // 86400)} days ago"
+    else:
+        return sent_at.strftime("%b %d, %Y")

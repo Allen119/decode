@@ -8,8 +8,7 @@
  "field_order": [
   "courseid",
   "message_text",
-  "sent_at",
-  "sent_by"
+  "sent_at"
  ],
  "fields": [
   {
@@ -23,12 +22,6 @@
    "label": "sent_at"
   },
   {
-   "fieldname": "sent_by",
-   "fieldtype": "Link",
-   "label": "sent_by",
-   "options": "user_reg"
-  },
-  {
    "fieldname": "courseid",
    "fieldtype": "Link",
    "label": "courseid",
@@ -37,7 +30,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-03-25 23:15:17.292871",
+ "modified": "2025-03-25 23:36:14.542964",
  "modified_by": "Administrator",
  "module": "decode",
  "name": "message",

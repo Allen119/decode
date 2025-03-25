@@ -62,66 +62,94 @@
       </div> -->
     </div>
     <div class="absolute bg-[#D9D9D9] w-[40%] h-[75%] top-[16%] right-[3.5%] rounded-[74px]">
-    <div class="absolute bg-white w-[92%] h-[90%] top-[5%] right-[4%] rounded-[74px] overflow-hidden">
-      <h3 class="absolute text-lg text-black font-light left-[3%] top-[5%]">Questions</h3>
-      
-      <!-- List of questions - scrollable while keeping the header fixed -->
-      <div class="absolute left-[3%] top-[9%] w-[93%] h-[40%] overflow-y-auto pr-4 bg-black">
-        <ul class="text-lg text-black font-light">
-          <li v-for="(question, index) in questions" :key="question.name"
+      <div class="absolute bg-white w-[92%] h-[90%] top-[5%] right-[4%] rounded-[74px] overflow-hidden">
+        <h3 class="absolute text-lg text-black font-light left-[3%] top-[5%]">Questions</h3>
+
+        <!-- List of questions - scrollable while keeping the header fixed -->
+        <div class="absolute left-[3%] top-[9%] w-[93%] h-[40%] overflow-y-auto pr-4 bg-white">
+          <ul class="text-lg text-black font-light">
+            <li v-for="(question, index) in questions" :key="question.name"
               @click="fetchQuestionDetails(question.title, question.courseid)"
               class="p-2 border-gray-600 cursor-pointer hover:bg-gray-700 hover:text-white transition flex justify-between items-center relative group">
-            
-            <!-- Question Title -->
-            <span>{{ index + 1 }}. {{ question.title }}</span>
-            
-            <!-- Three Dots & Delete Button Container -->
-            <div class="relative">
-              <!-- Three Dots Icon (Visible on Hover) -->
-              <span 
-                @click.stop="toggleOptions(index)" 
-                class="opacity-0 group-hover:opacity-100 transition cursor-pointer">
-                ⋮
-              </span>
-              
-              <!-- Delete Button (Appears next to the dots) -->
-              <button 
-                v-if="selectedIndex === index"
-                @click.stop="deleteQuestion(question.name)"
-                class="absolute right-6 top-1/2 transform -translate-y-1/2 bg-red-500 text-white px-3 py-1  shadow-lg hover:bg-red-700 transition">
-                Delete
-              </button>
-            </div>
-          </li>
-        </ul>
+
+              <!-- Question Title -->
+              <span>{{ index + 1 }}. {{ question.title }}</span>
+
+              <!-- Three Dots & Delete Button Container -->
+              <div class="relative">
+                <!-- Three Dots Icon (Visible on Hover) -->
+                <span @click.stop="toggleOptions(index)"
+                  class="opacity-0 group-hover:opacity-100 transition cursor-pointer">
+                  ⋮
+                </span>
+
+                <!-- Delete Button (Appears next to the dots) -->
+                <button v-if="selectedIndex === index" @click.stop="deleteQuestion(question.name)"
+                  class="absolute right-6 top-1/2 transform -translate-y-1/2 bg-red-500 text-white px-3 py-1  shadow-lg hover:bg-red-700 transition">
+                  Delete
+                </button>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+
+
+
+        <h3 class="absolute text-lg text-black font-light left-[3%] top-[50%]">Messages</h3>
+        <div class="absolute left-[3%] top-[54%] w-[93%] h-[40%] overflow-y-auto pr-4 bg-white text-black">
+          <!-- Display messages -->
+          <ul v-if="messages.length > 0" class="text-left p-0 m-0">
+            <li v-for="(msg, index) in messages" :key="msg.name"
+              class="p-2 flex justify-between items-center relative font-light">
+
+              <!-- Message Content -->
+              <span>{{ index + 1 }}. {{ msg.message_text }}</span>
+
+              <!-- Timestamp -->
+              <span class="text-gray-600 text-sm opacity-60">{{ msg.time_ago }}</span>
+            </li>
+          </ul>
+
+          <p v-else class="text-gray-400 p-2 font-light">No messages yet.</p>
+
+          <!-- Message Input Container -->
+          <div v-if="showMessageBox"
+            class="absolute bottom-4 right-4 w-[300px] bg-white p-4 rounded-lg shadow-lg border border-gray-300">
+
+            <!-- Close Button (❌) -->
+            <button @click="showMessageBox = false"
+              class="absolute top-2 right-2 text-gray-500 hover:text-black text-lg font-bold">
+              &times;
+            </button>
+
+            <h3 class="text-black text-lg font-semibold mb-2">Send a Message</h3>
+
+            <!-- Input Field -->
+            <input v-model="message" type="text" placeholder="Type your message..."
+              class="w-full p-2 border text-black border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+
+            <!-- Post Button -->
+            <button @click="postMessage"
+              class="mt-4 bg-[rgba(40,41,71,1)] text-white px-4 py-2 rounded hover:bg-[#797a9c] transition float-right">
+              Post
+            </button>
+          </div>
+        </div>
+
+
+
       </div>
-      <h3 class="absolute text-lg text-black font-light left-[3%] top-[50%]">Messages</h3>
-      <div class="absolute left-[3%] top-[54%] w-[93%] h-[40%] overflow-y-auto pr-4 bg-black">
-    <!-- Message Button -->
+
+
+
+
+    </div>
     <button @click="showMessageBox = !showMessageBox"
-      class="absolute top-2 right-4 bg-[rgba(40,41,71,1)] text-white px-4 py-2 rounded hover:bg-[#797a9c] transition">
+      class="absolute bottom-[2.7%] right-[11%] bg-[rgba(40,41,71,1)] text-white px-4 py-2 rounded hover:bg-[#797a9c] transition">
       Message
     </button>
 
-    <!-- Message Input Container -->
-    <div v-if="showMessageBox"
-      class="absolute bottom-4 right-4 w-[300px] bg-white p-4 rounded-lg shadow-lg border border-gray-300">
-      <h3 class="text-black text-lg font-semibold mb-2">Send a Message</h3>
-
-      <!-- Input Field -->
-      <input v-model="message" type="text" placeholder="Type your message..."
-        class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-
-      <!-- Post Button -->
-      <button @click="postMessage"
-        class="mt-4 bg-[rgba(40,41,71,1)] text-white px-4 py-2 rounded hover:bg-[#797a9c] transition float-right">
-        Post
-      </button>
-    </div>
-  </div>
-
-    </div>
-  </div>
     <!-- Button to fetch and display members -->
     <div class="absolute bg-white w-[6%] h-[5%] bottom-[2%] right-[4%] rounded-[74px]">
       <button @click="toggleMembers"
@@ -129,7 +157,6 @@
         Members
       </button>
     </div>
-
     <!-- Members container (shows only when showMembers is true) -->
     <div v-if="showMembers"
       class="absolute bg-white p-4 rounded shadow-lg right-[4%] bottom-[8%] w-[10%] max-h-[30%] overflow-hidden">
@@ -437,10 +464,73 @@ const navigateToFile = (filename) => {
   }
 };
 
+const showMessageBox = ref(false);
+const message = ref("");
+
+const postMessage = async () => {
+  if (message.value.trim() === "") {
+    alert("Message cannot be empty!");
+    return;
+  }
+
+  try {
+    const response = await fetch("http://decode.local:8080/api/method/decode.api.post_message", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        course_id: courseId.value,
+        message_text: message.value
+      })
+    });
+
+    const data = await response.json();
+
+    // Correctly extract the success key from nested response
+    if (data.message?.success) {
+      console.log("Message Posted Successfully:", data);
+      fetchMessages();
+      alert("Message posted ");
+      message.value = ""; // Clear input after posting
+    } else {
+      console.error("Error posting message:", data.message?.error || "Unknown error");
+    }
+  } catch (error) {
+    console.error("Request failed:", error);
+  }
+};
+
+const messages = ref([]); // Store fetched messages
+
+// Fetch messages from backend
+const fetchMessages = async () => {
+  try {
+    const response = await fetch(`http://decode.local:8080/api/method/decode.api.get_messages?course_id=${courseId.value}`);
+    const data = await response.json();
+    console.log("Full API Response:", data);
+
+    // Extract the nested message object
+    const messageData = data.message;
+    console.log("Extracted Message Data:", messageData);
+
+    if (messageData && messageData.success) {
+      messages.value = messageData.messages;
+      console.log("Messages loaded:", messages.value);
+    } else {
+      console.error("Error fetching messages:", messageData?.error || "Unknown backend error");
+    }
+  } catch (error) {
+    console.error("Request failed:", error);
+  }
+};
+
+
 onMounted(() => {
   fetchQuestions();
   fetchGroupDetails();
   getMembers();
+  fetchMessages();
 });
 
 </script>

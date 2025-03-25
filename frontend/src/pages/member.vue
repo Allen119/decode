@@ -37,7 +37,7 @@
             <!-- <p class="absolute text-lg text-black font-light left-[3%] top-[30%]">Questions</p> -->
             <div class="absolute bg-white w-[80%] h-[65%] top-[32%] left-[3.2%] rounded-[50px]">
                 <h3 class="absolute text-lg text-black font-light left-[3%] top-[5%]">Questions</h3>
-                <div class="absolute left-[3%] top-[12%] w-[93%] h-[80%] overflow-y-auto pr-4">
+                <div class="absolute left-[3%] top-[12%] w-[93%] h-[80%] overflow-y-auto pr-4 ">
                     <ul class="text-lg text-black font-light">
                         <li v-for="(question, index) in questions" :key="question.name"
                             class="mb-2 cursor-pointer hover:underline" @click="fetchQuestionDetails(question.title);">
@@ -50,10 +50,28 @@
         <div class="absolute bg-[#D9D9D9] w-[40%] h-[75%] top-[16%] right-[3.5%] rounded-[74px]">
             <div class="absolute bg-white w-[92%] h-[90%] top-[5%] right-[4%] rounded-[74px]">
                 <h3 class="absolute text-lg text-black font-light left-[3%] top-[5%]">Description</h3>
-                <div class="absolute left-[3%] top-[12%] w-[90%] h-[80%] p-0 text-black font-light
-            break-words overflow-y-auto">
+
+                <!-- Description Container (Added px-4 padding) -->
+                <div
+                    class="absolute left-[3%] top-[9%] w-[90%] h-[40%] px-4 text-black font-light bg-white break-words overflow-y-auto">
                     {{ groupDetails.description }}
                 </div>
+
+                <h3 class="absolute text-lg text-black font-light left-[3%] top-[50%]">Messages</h3>
+
+                <!-- Messages Container -->
+                <div class="absolute left-[3%] top-[54%] w-[93%] h-[41%] overflow-y-auto bg-white text-black px-4">
+                    <ul v-if="messages.length > 0" class="text-left p-0 m-0">
+                        <li v-for="(msg, index) in messages" :key="msg.name" class="pb-2 pl-0 font-light">
+                            {{ index + 1 }}. {{ msg.message_text }}
+                            <span class="text-gray-600 text-sm opacity-60">({{ msg.time_ago }})</span>
+                        </li>
+                    </ul>
+
+                    <p v-else class="text-gray-400 p-4">No messages yet.</p>
+                </div>
+
+
             </div>
         </div>
         <!-- Display selected question details -->
@@ -277,11 +295,34 @@ watch(selectedQuestion, (newVal) => {
         existingFile.value = null; // Reset when modal is closed
     }
 });
+const messages = ref([]); // Store fetched messages
 
+// Fetch messages from backend
+const fetchMessages = async () => {
+    try {
+        const response = await fetch(`http://decode.local:8080/api/method/decode.api.get_messages?course_id=${courseId.value}`);
+        const data = await response.json();
+        console.log("Full API Response:", data);
+
+        // Extract the nested message object
+        const messageData = data.message;
+        console.log("Extracted Message Data:", messageData);
+
+        if (messageData && messageData.success) {
+            messages.value = messageData.messages;
+            console.log("Messages loaded:", messages.value);
+        } else {
+            console.error("Error fetching messages:", messageData?.error || "Unknown backend error");
+        }
+    } catch (error) {
+        console.error("Request failed:", error);
+    }
+};
 
 onMounted(() => {
     fetchQuestions();
     fetchGroupDetails();
+    fetchMessages();
 });
 
 </script>
