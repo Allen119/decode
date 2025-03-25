@@ -40,9 +40,10 @@ def login_user(email, password):
     try:
         # Retrieve the full user document
         user_doc = frappe.get_doc("user_reg", {"email": email})
+        
         if not user_doc:
             return {"message": "User with this email does not exist."}
-
+        
         # Hash the input password
         hashed_input_password = hashlib.sha256(password.encode()).hexdigest()
         
@@ -51,28 +52,21 @@ def login_user(email, password):
         
         # Compare hashed passwords
         if stored_password != hashed_input_password:
-            return {"message": "Invalid password."}
-        
-        # Generate a token - you can use JWT or another token generation method
-        import jwt
-        import datetime
-        
-        # Create a token with user information and expiration
-        token = jwt.encode({
-            'user': user_doc.name,
-            'email': email,
-            'exp': datetime.datetime.utcnow() + datetime.timedelta(days=1)
-        }, '275871', algorithm='HS256')  # Replace with a secure secret key
-        
-        x=user_doc.name
-        
-        return {
-            "message": {
-                "message": "Login successful!",
-                "token": token,
-                "user": user_doc.name
+            return {
+                "message": "Invalid password.",
+                "stored_password": stored_password,
+                "input_password": hashed_input_password
             }
+        
+        x = user_doc.name
+
+        return {
+            "message": "Login successful!",
+            "user": user_doc.name,
+            "stored_password": stored_password,
+            "input_password": hashed_input_password
         }
+    
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Login User Error")
         return {"message": f"An error occurred: {str(e)}"}
@@ -436,7 +430,7 @@ def get_questions(courseId):
         questions = frappe.get_all(
             "question",
             filters={"courseid": courseId},  # Compare course_id field
-            fields=["name", "title", "description", "guide", "courseid"]
+            fields=["name", "title", "description", "courseid"]
         )
 
         return {"questions": questions}
@@ -849,5 +843,23 @@ def logout():
     x = None  # Set global x to None
     frappe.cache().set_value("x", None)  # Store x as None in cache
     return {"status": "success", "message": "Logged out successfully", "Value": x}
+
+@frappe.whitelist(allow_guest=True)
+def deleteques(name):
+    global x
+    try:
+        if not name or not x:
+            return {"error": "Login required"}
+
+        # Check if the question exists
+        if not frappe.db.exists("question", name):
+            return {"error": "Question not found"}
+
+        # Delete the question
+        frappe.delete_doc("Question", name, force=True)
+        return {"message": "Question deleted successfully"}
+
+    except Exception as e:
+        return {"error": str(e)}
 
 

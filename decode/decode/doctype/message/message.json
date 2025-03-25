@@ -1,22 +1,17 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "UUID",
  "creation": "2025-02-23 15:00:49.959470",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "question",
+  "courseid",
   "message_text",
   "sent_at",
   "sent_by"
  ],
  "fields": [
-  {
-   "fieldname": "question",
-   "fieldtype": "Link",
-   "label": "question",
-   "options": "question"
-  },
   {
    "fieldname": "message_text",
    "fieldtype": "Text Editor",
@@ -32,14 +27,21 @@
    "fieldtype": "Link",
    "label": "sent_by",
    "options": "user_reg"
+  },
+  {
+   "fieldname": "courseid",
+   "fieldtype": "Link",
+   "label": "courseid",
+   "options": "group"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-02-23 15:03:52.671002",
+ "modified": "2025-03-25 23:15:17.292871",
  "modified_by": "Administrator",
  "module": "decode",
  "name": "message",
+ "naming_rule": "UUID",
  "owner": "Administrator",
  "permissions": [
   {

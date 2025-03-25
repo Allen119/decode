@@ -62,24 +62,66 @@
       </div> -->
     </div>
     <div class="absolute bg-[#D9D9D9] w-[40%] h-[75%] top-[16%] right-[3.5%] rounded-[74px]">
-      <div class="absolute bg-white w-[92%] h-[90%] top-[5%] right-[4%] rounded-[74px] overflow-hidden">
-        <h3 class="absolute text-lg text-black font-light left-[3%] top-[5%]">Questions</h3>
-        <!-- List of questions - making this container scrollable while keeping the header fixed -->
-        <div class="absolute left-[3%] top-[12%] w-[93%] h-[80%] overflow-y-auto pr-4">
-          <ul class="text-lg text-black font-light">
-            <li v-for="(question, index) in questions" :key="question.name"
+    <div class="absolute bg-white w-[92%] h-[90%] top-[5%] right-[4%] rounded-[74px] overflow-hidden">
+      <h3 class="absolute text-lg text-black font-light left-[3%] top-[5%]">Questions</h3>
+      
+      <!-- List of questions - scrollable while keeping the header fixed -->
+      <div class="absolute left-[3%] top-[9%] w-[93%] h-[40%] overflow-y-auto pr-4 bg-black">
+        <ul class="text-lg text-black font-light">
+          <li v-for="(question, index) in questions" :key="question.name"
               @click="fetchQuestionDetails(question.title, question.courseid)"
-              class="mb-2 cursor-pointer hover:text-blue-500 transition">
-              {{ index + 1 }}. {{ question.title }}
-            </li>
-          </ul>
-        </div>
-
-
-
-
+              class="p-2 border-gray-600 cursor-pointer hover:bg-gray-700 hover:text-white transition flex justify-between items-center relative group">
+            
+            <!-- Question Title -->
+            <span>{{ index + 1 }}. {{ question.title }}</span>
+            
+            <!-- Three Dots & Delete Button Container -->
+            <div class="relative">
+              <!-- Three Dots Icon (Visible on Hover) -->
+              <span 
+                @click.stop="toggleOptions(index)" 
+                class="opacity-0 group-hover:opacity-100 transition cursor-pointer">
+                ⋮
+              </span>
+              
+              <!-- Delete Button (Appears next to the dots) -->
+              <button 
+                v-if="selectedIndex === index"
+                @click.stop="deleteQuestion(question.name)"
+                class="absolute right-6 top-1/2 transform -translate-y-1/2 bg-red-500 text-white px-3 py-1  shadow-lg hover:bg-red-700 transition">
+                Delete
+              </button>
+            </div>
+          </li>
+        </ul>
       </div>
+      <h3 class="absolute text-lg text-black font-light left-[3%] top-[50%]">Messages</h3>
+      <div class="absolute left-[3%] top-[54%] w-[93%] h-[40%] overflow-y-auto pr-4 bg-black">
+    <!-- Message Button -->
+    <button @click="showMessageBox = !showMessageBox"
+      class="absolute top-2 right-4 bg-[rgba(40,41,71,1)] text-white px-4 py-2 rounded hover:bg-[#797a9c] transition">
+      Message
+    </button>
+
+    <!-- Message Input Container -->
+    <div v-if="showMessageBox"
+      class="absolute bottom-4 right-4 w-[300px] bg-white p-4 rounded-lg shadow-lg border border-gray-300">
+      <h3 class="text-black text-lg font-semibold mb-2">Send a Message</h3>
+
+      <!-- Input Field -->
+      <input v-model="message" type="text" placeholder="Type your message..."
+        class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+
+      <!-- Post Button -->
+      <button @click="postMessage"
+        class="mt-4 bg-[rgba(40,41,71,1)] text-white px-4 py-2 rounded hover:bg-[#797a9c] transition float-right">
+        Post
+      </button>
     </div>
+  </div>
+
+    </div>
+  </div>
     <!-- Button to fetch and display members -->
     <div class="absolute bg-white w-[6%] h-[5%] bottom-[2%] right-[4%] rounded-[74px]">
       <button @click="toggleMembers"
@@ -179,6 +221,40 @@ const groupDetails = ref({
   groupowner: '',
   description: ''
 });
+const selectedIndex = ref(null);
+
+const toggleOptions = (index) => {
+  selectedIndex.value = selectedIndex.value === index ? null : index;
+};
+
+const deleteQuestion = async (questionName) => {
+  try {
+    const response = await fetch('http://decode.local:8080/api/method/decode.api.deleteques', {
+      method: 'POST',
+      credentials: 'include', // Include cookies if needed
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: questionName, // Sending question name to backend
+      }),
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      alert('Question deleted successfully!');
+      questions.value = questions.value.filter(q => q.name !== questionName); // Remove from UI
+      selectedIndex.value = null; // Close menu
+    } else {
+      alert(data.message || 'Failed to delete question');
+    }
+  } catch (error) {
+    console.error('Error deleting question:', error);
+    alert('Network error. Please try again.');
+  }
+};
+
 
 const fetchGroupDetails = async () => {
   try {
@@ -186,7 +262,6 @@ const fetchGroupDetails = async () => {
       `http://decode.local:8080/api/method/decode.api.get_group_details?courseId=${courseId.value}`
     );
     const data = await response.json();
-
     // Extract just the fields we need from the response
     if (data.message && !data.message.error) {
       groupDetails.value = {
@@ -248,6 +323,7 @@ const fetchQuestions = async () => {
       credentials: "include",
     });
     const data = await response.json();
+    console.log("Questions data:", data);
     if (data.message && data.message.questions) {
       questions.value = data.message.questions; // Store filtered questions
     } else {

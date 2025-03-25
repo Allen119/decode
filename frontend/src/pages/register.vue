@@ -144,16 +144,24 @@ const registerUser = async () => {
     });
 
     if (response.ok) {
-      alert('Registration successful!');
-      navigateTo('/signin');
+      if (data.message && data.message.message === "Registration successful!") {
+        alert('Registration successful!');
+        navigateTo('/signin');
+      }else if(data.message.message === "Email already registered."){
+      registerError .value = 'Email already registered';
+      }
+       else {
+        registerError.value = 'Unexpected response from server';
+      }
     } else {
-      registerError.value = data.message || 'Registration failed';
+      registerError.value = data.message?.message || 'Registration failed';
     }
   } catch (error) {
     console.error('Complete error:', error);
     registerError.value = 'Network error. Please try again.';
   }
 };
+
 </script>
 <style scoped>
 /* Add any custom styles here */

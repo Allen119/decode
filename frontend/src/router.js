@@ -27,6 +27,16 @@ const routes = [
     name: 'main',
     path: '/main',
     component: () => import('@/pages/main.vue'),
+    beforeEnter: (to, from, next) => {
+      // Check if coming from filecode route
+      if (from.name === 'filecode') {
+        // Force a page reload only when coming from filecode
+        window.location.reload()
+      } else {
+        // Proceed normally for other navigation scenarios
+        next()
+      }
+    }
   },
   {
     name: 'filecode',

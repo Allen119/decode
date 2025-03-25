@@ -515,19 +515,13 @@ const startResize = (e) => {
 
 onUnmounted(() => {
   try {
-    // Check if the fitAddon was actually loaded before disposing
-    if (fitAddon.value && terminal.value?.loadedAddons?.has(fitAddon.value)) {
-      fitAddon.value.dispose();
-      fitAddon.value = null;
-    }
-
-    // Dispose the terminal only if it exists
+    // Dispose of the terminal
     if (terminal.value) {
       terminal.value.dispose();
       terminal.value = null;
     }
 
-    // Destroy the CodeMirror editor safely
+    // Destroy the CodeMirror editor
     if (editor.value) {
       editor.value.destroy();
       editor.value = null;
@@ -536,7 +530,7 @@ onUnmounted(() => {
     // Remove resize event listener
     window.removeEventListener("resize", handleResize);
   } catch (error) {
-    console.warn("Error disposing terminal, fitAddon, or editor:", error);
+    console.error("Error during component unmount:", error);
   }
 });
 
