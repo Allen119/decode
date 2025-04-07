@@ -282,43 +282,45 @@ const waitingForInput = ref(false);
 const inputPromptQueue = ref([]);
 const inputResponses = ref([]);
 const currentInputPrompt = ref('');
+const shownPrompts = ref([]); 
 
 const handleTerminalInput = (data) => {
   const char = data;
 
-  // Handle input differently when in Python execution mode
+  // Input mode for Python or C (interactive input phase)
   if (isExecutingPython.value && waitingForInput.value) {
     if (char === '\x7F' || char === '\b') { // Backspace
       if (currentInput.value.length > 0) {
         currentInput.value = currentInput.value.slice(0, -1);
         terminal.value.write('\b \b');
       }
-    }
-    else if (char === '\r') { // Enter
+    } else if (char === '\r') { // Enter
       terminal.value.writeln('');
-      // Store the input response
+      
+      // Store the user input
       inputResponses.value.push(currentInput.value);
+      currentInput.value = '';
+      waitingForInput.value = false;
 
-      // Process the next input prompt if any
-      processNextInputPrompt();
-    }
-    else if (char === '\x03') { // Ctrl + C
-      if (isExecutingPython.value) {
-        terminal.value.writeln('^C');
-        isExecutingPython.value = false;
-        waitingForInput.value = false;
-        currentInput.value = '';
-        inputPromptQueue.value = [];
-        inputResponses.value = [];
-        terminal.value.write('$ ');
+      // Continue execution (for both C and Python)
+      if (fileName.value.endsWith('.c')) {
+        processNextExecutionStep(editor.value.state.doc.toString());
+      } else {
+        processNextInputPrompt(); // For Python or other
       }
-      return;
-    }
-    else { // Regular characters
+    } else if (char === '\x03') { // Ctrl + C
+      terminal.value.writeln('^C');
+      isExecutingPython.value = false;
+      waitingForInput.value = false;
+      currentInput.value = '';
+      inputPromptQueue.value = [];
+      inputResponses.value = [];
+      terminal.value.write('$ ');
+    } else {
       terminal.value.write(char);
       currentInput.value += char;
     }
-    return;
+    return; // Exit early when in execution mode
   }
 
   // Normal terminal command mode
@@ -327,36 +329,33 @@ const handleTerminalInput = (data) => {
       currentInput.value = currentInput.value.slice(0, -1);
       terminal.value.write('\b \b');
     }
-  }
-  else if (char === '\r') { // Enter
+  } else if (char === '\r') { // Enter key in normal mode
     terminal.value.writeln('');
     if (currentInput.value.trim() !== '') {
-      commandHistory.value.unshift(currentInput.value.trim()); // Store command in history
-      historyIndex.value = -1; // Reset history navigation
+      commandHistory.value.unshift(currentInput.value.trim());
+      historyIndex.value = -1;
     }
-    handleCommand(currentInput.value);
+    handleCommand(currentInput.value); // Run normal shell command
     currentInput.value = '';
     if (!isExecutingPython.value) {
       terminal.value.write('$ ');
     }
-  }
-  else if (char === '\x1b[A') { // Up arrow
+  } else if (char === '\x1b[A') { // Arrow Up
     if (historyIndex.value < commandHistory.value.length - 1) {
       historyIndex.value++;
       updateTerminalInput(commandHistory.value[historyIndex.value]);
     }
-  }
-  else if (char === '\x1b[B') { // Down arrow
+  } else if (char === '\x1b[B') { // Arrow Down
     if (historyIndex.value > -1) {
       historyIndex.value--;
       updateTerminalInput(historyIndex.value === -1 ? '' : commandHistory.value[historyIndex.value]);
     }
-  }
-  else { // Regular characters
+  } else { // Regular character
     terminal.value.write(char);
     currentInput.value += char;
   }
 };
+
 
 const handleCommand = (command) => {
   switch (command.trim()) {
@@ -367,12 +366,23 @@ const handleCommand = (command) => {
       terminal.value.writeln('Available commands:');
       terminal.value.writeln(' clear - Clear terminal');
       terminal.value.writeln(` python ${fileName.value} - Run Python code`);
+      terminal.value.writeln(` run ${fileName.value} - Run current code`);
       terminal.value.writeln(' help - Show this help message');
       break;
     case `python ${fileName.value}`:
       const code = editor.value.state.doc.toString();
       startPythonExecution(code);
       break;
+    case `run ${fileName.value}`: {
+      const code = editor.value.state.doc.toString();
+      if (fileName.value.endsWith('.c')) {
+        startCExecution(code);
+      } else {
+        startPythonExecution(code);
+      }
+      break;
+    }
+
     default:
       terminal.value.writeln(`Command not found: ${command}`);
       break;
@@ -408,6 +418,17 @@ const parseInputPrompts = (code) => {
 
   return prompts;
 };
+const parseScanfPrompts = (code) => {
+  const regex = /printf\s*\((["'])(.*?)\1\);?\s*scanf\s*\(/g;
+  const prompts = [];
+  let match;
+
+  while ((match = regex.exec(code)) !== null) {
+    prompts.push(match[2]); // Just the prompt before scanf
+  }
+
+  return prompts;
+};
 
 
 // Start Python execution with interactive input handling
@@ -417,36 +438,159 @@ const startPythonExecution = (code) => {
   inputResponses.value = [];
   terminal.value.writeln('Executing Python script...');
 
-  // Parse code for input prompts
   inputPromptQueue.value = parseInputPrompts(code);
 
   if (inputPromptQueue.value.length > 0) {
-    // Start processing input prompts
     processNextInputPrompt();
   } else {
-    // No input needed, execute directly
     executePythonCode(code, []);
   }
 };
+
+
+
+const startCExecution = (code) => {
+  isExecutingPython.value = true;
+  waitingForInput.value = false;
+  inputResponses.value = [];
+  shownPrompts.value = []; // Reset prompt tracking
+  terminal.value.writeln('Executing C program...');
+
+  // Get all printf/scanf steps in order
+  const steps = parseOrderedExecutionSteps(code);
+
+  executionQueue.value = steps; // Store to process step by step
+
+  processNextExecutionStep(code);
+};
+
+
+const executionQueue = ref([]);
+
+const processNextExecutionStep = (code) => {
+  if (executionQueue.value.length === 0) {
+    // Done with all steps
+    if (fileName.value.endsWith('.c')) {
+      executeCCode(code, inputResponses.value);
+    } else {
+      executePythonCode(code, inputResponses.value);
+    }
+    return;
+  }
+
+  const step = executionQueue.value.shift();
+  shownPrompts.value.push(step.prompt); // So we filter later
+
+  terminal.value.write(step.prompt);
+
+  if (step.isInput) {
+    waitingForInput.value = true;
+    currentInputPrompt.value = step.prompt;
+    currentInput.value = '';
+  } else {
+    processNextExecutionStep(code); // Go to next step immediately
+  }
+};
+
+
+
+const parseOrderedExecutionSteps = (code) => {
+  const lines = [];
+  const printfScanfRegex = /printf\s*\((["'])(.*?)\1\);(\s*scanf\s*\(.*?\);)?/g;
+
+  let match;
+  while ((match = printfScanfRegex.exec(code)) !== null) {
+    const prompt = match[2];
+    const hasScanf = match[3]?.includes('scanf');
+    lines.push({
+      prompt,
+      isInput: !!hasScanf
+    });
+  }
+
+  return lines;
+};
+
 
 // Process the next input prompt
 const processNextInputPrompt = () => {
   if (inputPromptQueue.value.length > 0) {
     currentInputPrompt.value = inputPromptQueue.value.shift();
+    
+    // ✅ Store prompt so we can filter repeated printf output later
+    shownPrompts.value.push(currentInputPrompt.value);
+
     terminal.value.write(currentInputPrompt.value);
     currentInput.value = '';
     waitingForInput.value = true;
   } else {
-    // All inputs collected, replace input() with user responses
-    let code = editor.value.state.doc.toString();
+    const code = editor.value.state.doc.toString();
 
-    inputResponses.value.forEach((input, index) => {
-      code = code.replace(/input\((["']?)(.*?)\1?\)/, `"${input}"`);
-    });
-
-    executePythonCode(code);
+    if (fileName.value.endsWith('.c')) {
+      executeCCode(code, inputResponses.value); // Pass inputs to C executor
+    } else {
+      executePythonCode(code, inputResponses.value); // Or Python executor
+    }
   }
 };
+
+const executeCCode = async (code, inputs = []) => {
+  try {
+    const response = await fetch('http://decode.local:8080/api/method/decode.api.execute_c', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        code,
+        user_input: inputs.join(' ')  // Join inputs for scanf
+      }),
+    });
+
+    const data = await response.json();
+
+    if (data.message) {
+      console.log("C Execution Response:", data);
+
+      if (data.message.output) {
+        // 🧼 Filter out prompts that were already printed
+        let output = data.message.output;
+
+        shownPrompts.value.forEach(prompt => {
+          output = output.replace(prompt, '');
+        });
+
+        // Write filtered output to terminal
+        output.split("\n").forEach(line => {
+          if (line.trim() !== '') {
+            terminal.value.writeln(line);
+          }
+        });
+      }
+
+      if (data.message.error) {
+        terminal.value.writeln("Error:");
+        data.message.error.split("\n").forEach(line => terminal.value.writeln(line));
+      }
+    } else {
+      terminal.value.writeln("No output received.");
+    }
+  } catch (error) {
+    console.error("API Call Failed:", error);
+    terminal.value.writeln(`Error executing C code: ${error.message}`);
+  } finally {
+    isExecutingPython.value = false;
+    waitingForInput.value = false;
+    currentInput.value = '';
+    inputPromptQueue.value = [];
+    inputResponses.value = [];
+    shownPrompts.value = []; // 🧼 Clear prompt tracking
+
+    terminal.value.write('$ ');
+  }
+};
+
 
 const executePythonCode = async (code, inputs = []) => {
   try {

@@ -319,14 +319,17 @@ def execute_c(code, user_input=None):
     try:
         frappe.logger().info("Executing C Code")
 
-        # Use raw user_input as is (multi-line)
-        input_data = user_input.strip() + "\n" if user_input else ""
+        # Handle multiline input from frontend
+        if isinstance(user_input, list):
+            input_data = "\n".join(user_input) + "\n"
+        else:
+            input_data = user_input.strip() + "\n" if user_input else ""
 
-        # Save C code to a temporary file
+        # Save C code to a temp file
         with open("/tmp/program.c", "w") as f:
             f.write(code)
 
-        # Compile it
+        # Compile the code
         compile_process = subprocess.run(
             ["gcc", "/tmp/program.c", "-o", "/tmp/program"],
             stdout=subprocess.PIPE,
@@ -334,22 +337,20 @@ def execute_c(code, user_input=None):
             text=True
         )
 
-        # Handle compilation errors
         if compile_process.returncode != 0:
             return {
                 "output": "",
                 "error": compile_process.stderr.strip()
             }
 
-        # Run compiled program
+        # Run the compiled program
         run_process = subprocess.Popen(
-            ["/tmp/program"],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
+        ["stdbuf", "-oL", "/tmp/program"],  # -oL = line-buffered stdout
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
         )
-
         output, error = run_process.communicate(input=input_data, timeout=5)
 
         return {
@@ -361,6 +362,7 @@ def execute_c(code, user_input=None):
         return {"error": "Execution timed out.", "output": ""}
     except Exception as e:
         return {"error": str(e), "output": ""}
+
 
 
 @frappe.whitelist(allow_guest=True)
