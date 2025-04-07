@@ -6,10 +6,11 @@
     <header class="flex justify-between items-center p-5 flex-wrap">
       <!-- Logo on the left with size adjustment -->
       <div class="flex items-center mb-4 sm:mb-0">
-        <img src="@/assets/images/logo.png" alt="CodeCampus Logo"
-          class="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 mr-3" />
-        <div class="text-2xl font-bold text-white">Code Campus</div>
-      </div>
+  <img src="@/assets/images/logo.png" alt="CodeCampus Logo"
+    class="mr-3" style="width: 13%; height: auto;" />
+  <div class="text-2xl font-bold text-white">Code Campus</div>
+</div>
+
 
       <!-- Buttons on the right -->
       <div class="flex gap-4">

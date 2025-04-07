@@ -174,76 +174,72 @@ def getfiles(search_uuid):
         }
 
 
-import frappe
 from frappe import publish_realtime
-
 @frappe.whitelist(allow_guest=True)
 def update_code(file_uuid, code):
-    """Update code and broadcast changes to all connected clients"""
+    """Update code and broadcast changes to all connected clients."""
     try:
+        # Log incoming request with truncated code for readability
+        frappe.logger().debug(f"📩 Received update for file: {file_uuid}, code length: {len(code)}")
+        print(f"📩 Received update for file: {file_uuid}, code length: {len(code)}")
+        
         result = save_code_to_database(file_uuid, code)
         
-        if result["status"] == "success":
-            # Log before broadcasting
-            print(f"Broadcasting code update for file: {file_uuid}")
-            frappe.logger().debug(f"Broadcasting code update - File UUID: {file_uuid}")
-            
+        if result.get("status") == "success":
             message = {
                 "file_uuid": file_uuid,
-                "code": code,
-                "modified": result["file"]["modified"]
+                "content": code,
+                "modified": result["file"]["modified"],
+                "broadcast_id": frappe.utils.random_string(8)  # Add unique ID to track broadcast
             }
             
-            # Broadcast the update
+            # Enhanced logging
+            frappe.logger().debug(f"📡 Broadcasting update with ID {message['broadcast_id']} for file: {file_uuid}")
+            print(f"📡 Broadcasting update with ID {message['broadcast_id']} for file: {file_uuid}")
+            
+            # Broadcast to all clients
             publish_realtime(
                 event="code_update",
-                message=message,
-                user="all"
+                message=message
             )
             
-            # Ensure result["message"] is a dictionary before modifying it
+            # Log after broadcast attempt
+            print(f"✅ Completed broadcast attempt for ID {message['broadcast_id']}")
+            frappe.logger().debug(f"Broadcast completed for ID {message['broadcast_id']}")
+            
             if isinstance(result["message"], str):
-                result["message"] = {"text": result["message"]}  # Convert string to dictionary
+                result["message"] = {"text": result["message"]}
+                
+            result["message"]["websocket_broadcast"] = True
+            result["message"]["broadcast_id"] = message["broadcast_id"]
+            return result
             
-            result["message"]["websocket_broadcast"] = True  # Now it's safe to add
-
-            # Log the broadcast
-            print(f"Broadcast completed for file: {file_uuid}")
-            frappe.logger().debug(f"Code update broadcast completed for file: {file_uuid}")
-            
-        return result
-
+        return result  # file not found or other error
+        
     except Exception as e:
-        error_msg = f"Update Code Error: {str(e)}"
-        print(error_msg)
+        error_msg = f"❌ Update Code Error: {str(e)}"
         frappe.logger().error(error_msg)
+        print(error_msg)
         return {
             "status": "error",
-            "message": f"An error occurred: {str(e)}"
+            "message": {"text": f"An error occurred: {str(e)}"}
         }
 
 def save_code_to_database(file_uuid, code):
-    """Helper function to save code to database"""
+    """Save code to user_reg.codingfiles where UUID matches."""
     all_users = frappe.get_all("user_reg", fields=["name"])
-    users_with_coding_files = []
-    
+
     for user in all_users:
         user_doc = frappe.get_doc("user_reg", user.name)
-        if user_doc.codingfiles:
-            users_with_coding_files.append(user.name)
-    
-    for user_name in users_with_coding_files:
-        user_doc = frappe.get_doc("user_reg", user_name)
-        
         for file_entry in user_doc.codingfiles:
             if file_entry.name == file_uuid:
                 file_entry.code = code
                 user_doc.save()
-                
+
                 return {
                     "status": "success",
-                    "message": {  # Ensure message is a dictionary
-                        "text": f"File {file_uuid} updated successfully"
+                    "message": {
+                        "text": f"✅ File '{file_entry.filename}' updated successfully"
                     },
                     "file": {
                         "filename": file_entry.filename,
@@ -255,13 +251,14 @@ def save_code_to_database(file_uuid, code):
                         "owner": file_entry.owner
                     }
                 }
-    
+
     return {
         "status": "error",
-        "message": {  # Ensure message is a dictionary
-            "text": f"File with UUID {file_uuid} not found"
+        "message": {
+            "text": f"❌ File with UUID '{file_uuid}' not found"
         }
     }
+
 
 import subprocess
 @frappe.whitelist(allow_guest=True)
@@ -314,6 +311,58 @@ def execute(code, user_input=None):
         frappe.logger().error(f"Execution failed: {str(e)}")
         return {"error": str(e)}
     
+import frappe
+import subprocess
+
+@frappe.whitelist(allow_guest=True)
+def execute_c(code, user_input=None):
+    try:
+        frappe.logger().info("Executing C Code")
+
+        # Use raw user_input as is (multi-line)
+        input_data = user_input.strip() + "\n" if user_input else ""
+
+        # Save C code to a temporary file
+        with open("/tmp/program.c", "w") as f:
+            f.write(code)
+
+        # Compile it
+        compile_process = subprocess.run(
+            ["gcc", "/tmp/program.c", "-o", "/tmp/program"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+
+        # Handle compilation errors
+        if compile_process.returncode != 0:
+            return {
+                "output": "",
+                "error": compile_process.stderr.strip()
+            }
+
+        # Run compiled program
+        run_process = subprocess.Popen(
+            ["/tmp/program"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+
+        output, error = run_process.communicate(input=input_data, timeout=5)
+
+        return {
+            "output": output.strip(),
+            "error": error.strip()
+        }
+
+    except subprocess.TimeoutExpired:
+        return {"error": "Execution timed out.", "output": ""}
+    except Exception as e:
+        return {"error": str(e), "output": ""}
+
+
 @frappe.whitelist(allow_guest=True)
 def findbyuuid(uuid):
     # Get all user_reg documents

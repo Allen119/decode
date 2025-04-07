@@ -247,3 +247,8 @@ app_license = "mit"
 
 
 website_route_rules = [{'from_route': '/frontend/<path:app_path>', 'to_route': 'frontend'},]
+
+app_include_js = [
+    "/assets/frappe/js/lib/socket.io.min.js",
+    "/assets/frappe/js/frappe/socketio_client.js"
+]

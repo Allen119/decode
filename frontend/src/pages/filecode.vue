@@ -43,7 +43,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, onBeforeUnmount } from 'vue';
 import { useRoute } from 'vue-router';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
@@ -51,27 +51,21 @@ import '@xterm/xterm/css/xterm.css';
 import { EditorView, basicSetup } from 'codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { oneDark } from '@codemirror/theme-one-dark';
-import io from 'socket.io-client'
+import { python } from "@codemirror/lang-python";
+import { cpp } from "@codemirror/lang-cpp";
+import { EditorState } from "@codemirror/state";
+import { getSocket } from "../socket";
+const socket = getSocket();
 
-// API and WebSocket URLs
+// API URL
 const API_URL = `http://${window.location.hostname}:8080/api/method/decode.api.update_code`;
-const SOCKET_URL = `${window.location.hostname}:9000`;
 
 const route = useRoute();
 const codeMirrorContainer = ref(null);
 const editor = ref(null);
-const fileName = ref(""); // Store filename
+const fileName = ref("");
 const currentInput = ref('');
-const socket = ref(null);
 const codeContent = ref('');
-let isUpdating = false;
-let intervalId = null; 
-let inactivityTimeout = null;
-let isPaused = false; // Track if auto-refresh is paused
-
-// Constants for minimum widths
-const MIN_EDITOR_WIDTH = 400;
-const MIN_CONSOLE_WIDTH = 300;
 
 // Terminal refs
 const terminalContainer = ref(null);
@@ -85,179 +79,160 @@ const historyIndex = ref(-1);
 const codeEditorWidth = ref(0);
 const consoleWidth = ref(0);
 
-const connectSocket = () => {
-  try {
-    console.log('🔄 Attempting to connect to WebSocket at:', SOCKET_URL);
-    
-    socket.value = io(SOCKET_URL, { 
-      transports: ['websocket'],
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-      debug: true  // Enable socket.io debugging
-    });
+const hasChanges = ref(false);
+let pollingInterval = null;
+let fetchTimeout = null;
+let saveTimeout = null;
+let lastSavedContent = "";
+let periodicFetchInterval = null;
+let lastEditTime = Date.now();
+let isExternalUpdate = false;
 
-    // Add debugging for all socket events
-    socket.value.onAny((event, ...args) => {
-      console.log('🔍 Socket Event:', event, 'Data:', args);
-    });
-
-    socket.value.on('connect', () => {
-      console.log('✅ Connected to WebSocket');
-      console.log('🔌 Socket Details:', {
-        id: socket.value.id,
-        connected: socket.value.connected,
-        disconnected: socket.value.disconnected,
-        transport: socket.value.io.engine.transport.name
-      });
-    });
-
-    // Add specific handler for code_update
-    socket.value.on('code_update', (data) => {
-      console.log('📥 Received code update:', {
-        event: 'code_update',
-        fileUuid: data?.file_uuid,
-        currentFileUuid: route.params.uuid,
-        hasCode: Boolean(data?.code),
-        codeLength: data?.code?.length,
-        modified: data?.modified
-      });
-
-      if (data?.file_uuid === route.params.uuid && data?.code !== undefined) {
-        updateEditorContent(data.code);
-        console.log('✅ Editor updated with new code');
-      }
-    });
-
-    // Error handling
-    socket.value.on('connect_error', (error) => {
-      console.error('⚠️ Socket connection error:', {
-        error: error.message,
-        type: error.type,
-        description: error.description
-      });
-    });
-
-    socket.value.on('disconnect', (reason) => {
-      console.log('❌ Socket disconnected:', {
-        reason,
-        wasConnected: socket.value?.connected,
-        transport: socket.value?.io?.engine?.transport?.name
-      });
-    });
-
-  } catch (error) {
-    console.error('❌ Socket initialization error:', error);
+// Start periodic fetch when component mounts
+const startPeriodicFetch = () => {
+  // Clear any existing interval first
+  if (periodicFetchInterval) {
+    clearInterval(periodicFetchInterval);
   }
-};
 
-// Cleanup socket connection
-const cleanupSocket = () => {
-  try {
-    if (socket.value) {
-      socket.value.disconnect();
-      socket.value = null;
-      console.log('🔌 Socket disconnected and cleaned up');
+  // Set up new interval to fetch every 5 seconds if no changes
+  periodicFetchInterval = setInterval(() => {
+    const timeSinceLastEdit = Date.now() - lastEditTime;
+
+    // Only fetch if no edits in the last 3 seconds
+    if (timeSinceLastEdit >= 3000) {
+      fetchFileDetailsWithoutResetCursor();
     }
-  } catch (error) {
-    console.error('⚠️ Error cleaning up socket:', error);
-  }
+  }, 5000);
 };
 
-// Update editor content without triggering the update listener
-const updateEditorContent = (newCode) => {
-  if (editor.value && !isUpdating) {
-    isUpdating = true;
-    const transaction = editor.value.state.update({
-      changes: {
-        from: 0,
-        to: editor.value.state.doc.length,
-        insert: newCode
-      }
-    });
-    editor.value.dispatch(transaction);
-    isUpdating = false;
+const getLanguageExtension = () => {
+  if (fileName.value.endsWith(".py")) {
+    return python();
+  } else if (fileName.value.endsWith(".c")) {
+    return cpp(); // C/C++ are handled by lang-cpp
+  } else {
+    return javascript(); // default fallback
   }
 };
+startPeriodicFetch();
+
+// Modified fetch function that preserves cursor position
+const fetchFileDetailsWithoutResetCursor = () => {
+  // Make sure editor exists
+  if (!editor.value) return;
+
+  // Store current cursor position and selection before fetch
+  const cursorPos = editor.value.state.selection.main.head;
+  const selection = editor.value.state.selection;
+
+  // Set the flag to indicate an external update is in progress
+  isExternalUpdate = true;
+
+  // Call your original fetch function
+  fetchFileDetails().then(() => {
+    // After fetch completes and editor is updated, restore cursor position
+    setTimeout(() => {
+      if (editor.value && editor.value.dispatch) {
+        // Only restore if the cursor position is valid for the new content
+        const newDocLength = editor.value.state.doc.length;
+        const validPos = Math.min(cursorPos, newDocLength);
+
+        // Create a new selection at the previous position
+        const newSelection = editor.value.state.selection.constructor.create(
+          [editor.value.state.selection.constructor.range(validPos, validPos)],
+          0
+        );
+
+        // Dispatch the selection update
+        editor.value.dispatch({
+          selection: newSelection,
+          scrollIntoView: true
+        });
+      }
+
+      isExternalUpdate = false;
+    }, 10);
+  });
+};
+
 
 const initEditor = () => {
   const fileUuid = route.params.uuid;
+
   if (codeMirrorContainer.value && !editor.value) {
+    // Initialize these variables when editor is created
+    lastSavedContent = codeContent.value;
+
     editor.value = new EditorView({
-      doc: codeContent.value,
-      extensions: [
-        basicSetup,
-        javascript(),
-        oneDark,
-        EditorView.updateListener.of(async (update) => {
-          if (update.docChanged && !isUpdating) {
-            const newCode = update.state.doc.toString();
-            codeContent.value = newCode;
+      state: EditorState.create({
+        doc: codeContent.value,
+        extensions: [
+          basicSetup,
+          oneDark,
+          getLanguageExtension(),
+          EditorView.updateListener.of((update) => {
+            // Skip processing if this update is from our external update handler
+            if (isExternalUpdate) return;
 
-            // Debug log before saving
-            console.log('📤 Saving code:', {
-              fileUuid,
-              codeLength: newCode.length,
-              timestamp: new Date().toISOString()
-            });
+            if (update.docChanged) {
+              const newCode = update.state.doc.toString();
+              codeContent.value = newCode;
 
-            try {
-              const response = await fetch(
-                `${API_URL}?file_uuid=${encodeURIComponent(fileUuid)}&code=${encodeURIComponent(newCode)}`,
-                {
+              // Update last edit time
+              lastEditTime = Date.now();
+
+              // Clear any pending fetch operation when content changes
+              if (fetchTimeout) {
+                clearTimeout(fetchTimeout);
+              }
+
+              // Don't save if content hasn't changed from last save
+              if (newCode === lastSavedContent) {
+                return;
+              }
+
+              // Debounced save (wait 500ms before saving)
+              if (saveTimeout) {
+                clearTimeout(saveTimeout);
+              }
+
+              saveTimeout = setTimeout(() => {
+                // Save to backend
+                fetch(`${API_URL}?file_uuid=${encodeURIComponent(fileUuid)}&code=${encodeURIComponent(newCode)}`, {
                   method: "PUT",
                   credentials: 'include',
                   headers: { 'Content-Type': 'application/json' }
-                }
-              );
+                })
+                  .then(res => res.json())
+                  .then(data => {
+                    console.log("Save response:", data);
+                    lastSavedContent = newCode; // Update last saved content
+                  })
+                  .catch(err => console.error("Save error:", err));
+              }, 500);
 
-              if (!response.ok) {
-                throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
-              }
-
-              const data = await response.json();
-              
-              // Enhanced success logging
-              console.log('💾 Save response:', {
-                status: data.status,
-                message: data.message,
-                fileDetails: data.file,
-                timestamp: new Date().toISOString()
-              });
-
-              // Check if we received a websocket broadcast confirmation
-              if (data.message?.websocket_broadcast == true) {
-                console.log('📡 WebSocket broadcast confirmed by server');
-              }
-
-            } catch (error) {
-              // Enhanced error logging
-              console.error('❌ Save error:',{
-                error: error.message,
-                type: error.name,
-                fileUuid,
-                timestamp: new Date().toISOString()
-              });
+              // Set up fetch timer - only call modified fetch after 3 seconds of inactivity
+              fetchTimeout = setTimeout(() => {
+                fetchFileDetailsWithoutResetCursor(); // Use the cursor-preserving version
+              }, 3000);
             }
-          }
-        }),
-      ],
+          })
+        ],
+      }),
       parent: codeMirrorContainer.value,
     });
 
-    console.log('✨ Editor initialized:', {
-      fileUuid,
-      initialContentLength: codeContent.value.length,
-      timestamp: new Date().toISOString()
-    });
+    // Start periodic fetch
+    startPeriodicFetch();
+
+    // Join socket room for this file
+    socket.emit("join", { room: fileUuid });
   }
 };
 
 
-// Fetch file details from the API
 const fetchFileDetails = async () => {
-  if (isPaused) return; // Skip fetching if paused
-
   try {
     const uuid = route.params.uuid;
     const response = await fetch(
@@ -271,7 +246,7 @@ const fetchFileDetails = async () => {
       }
     );
     const data = await response.json();
-    console.log("API Response:", data);
+    console.log("File details:", data);
 
     if (data.message.message === "You should log in first.") {
       alert("Login please!!");
@@ -290,7 +265,7 @@ const fetchFileDetails = async () => {
         });
       }
     } else {
-      alert(data.message);
+      alert(data.message.message);
     }
   } catch (error) {
     console.error("Error fetching file details:", error);
@@ -300,41 +275,53 @@ const fetchFileDetails = async () => {
   }
 };
 
-// Start auto-refresh
-const startAutoRefresh = () => {
-  if (intervalId) clearInterval(intervalId);
-  intervalId = setInterval(fetchFileDetails, 5000); // Fetch every 5 sec
-  console.log('⏳ Auto-refresh started');
-};
-
-// Pause and Resume Mechanism
-const resetInactivityTimer = () => {
-  clearTimeout(inactivityTimeout);
-  
-  if (isPaused) {
-    isPaused = false;
-    console.log("🔄 Resuming auto-refresh...");
-    startAutoRefresh(); // Restart auto-refresh if it was paused
-  }
-
-  inactivityTimeout = setTimeout(() => {
-    console.log("🛑 No activity detected! Pausing updates for 10 sec...");
-    isPaused = true;
-    clearInterval(intervalId); // Stop auto-refresh
-
-    setTimeout(() => {
-      console.log("✅ Resuming updates after 10 sec...");
-      isPaused = false;
-      startAutoRefresh();
-    }, 10000); // Wait 10 sec before resuming
-  }, 5000); // 5 sec of inactivity triggers pause
-};
-
-
 // Handle terminal input
+// State variables for interactive mode
+const isExecutingPython = ref(false);
+const waitingForInput = ref(false);
+const inputPromptQueue = ref([]);
+const inputResponses = ref([]);
+const currentInputPrompt = ref('');
+
 const handleTerminalInput = (data) => {
   const char = data;
 
+  // Handle input differently when in Python execution mode
+  if (isExecutingPython.value && waitingForInput.value) {
+    if (char === '\x7F' || char === '\b') { // Backspace
+      if (currentInput.value.length > 0) {
+        currentInput.value = currentInput.value.slice(0, -1);
+        terminal.value.write('\b \b');
+      }
+    }
+    else if (char === '\r') { // Enter
+      terminal.value.writeln('');
+      // Store the input response
+      inputResponses.value.push(currentInput.value);
+
+      // Process the next input prompt if any
+      processNextInputPrompt();
+    }
+    else if (char === '\x03') { // Ctrl + C
+      if (isExecutingPython.value) {
+        terminal.value.writeln('^C');
+        isExecutingPython.value = false;
+        waitingForInput.value = false;
+        currentInput.value = '';
+        inputPromptQueue.value = [];
+        inputResponses.value = [];
+        terminal.value.write('$ ');
+      }
+      return;
+    }
+    else { // Regular characters
+      terminal.value.write(char);
+      currentInput.value += char;
+    }
+    return;
+  }
+
+  // Normal terminal command mode
   if (char === '\x7F' || char === '\b') { // Backspace
     if (currentInput.value.length > 0) {
       currentInput.value = currentInput.value.slice(0, -1);
@@ -349,7 +336,9 @@ const handleTerminalInput = (data) => {
     }
     handleCommand(currentInput.value);
     currentInput.value = '';
-    terminal.value.write('$ ');
+    if (!isExecutingPython.value) {
+      terminal.value.write('$ ');
+    }
   }
   else if (char === '\x1b[A') { // Up arrow
     if (historyIndex.value < commandHistory.value.length - 1) {
@@ -376,12 +365,13 @@ const handleCommand = (command) => {
       break;
     case 'help':
       terminal.value.writeln('Available commands:');
-      terminal.value.writeln('  clear - Clear terminal');
-      terminal.value.writeln(`  python ${fileName.value} - Run Python code`);
-      terminal.value.writeln('  help - Show this help message');
+      terminal.value.writeln(' clear - Clear terminal');
+      terminal.value.writeln(` python ${fileName.value} - Run Python code`);
+      terminal.value.writeln(' help - Show this help message');
       break;
     case `python ${fileName.value}`:
-      executePythonCode(editor.value.state.doc.toString());
+      const code = editor.value.state.doc.toString();
+      startPythonExecution(code);
       break;
     default:
       terminal.value.writeln(`Command not found: ${command}`);
@@ -406,10 +396,59 @@ const clearTerminal = () => {
   currentInput.value = '';
 };
 
+// Function to parse Python code and extract input prompts
+const parseInputPrompts = (code) => {
+  const regex = /input\((["']?)(.*?)\1?\)/g;
+  const prompts = [];
+  let match;
+
+  while ((match = regex.exec(code)) !== null) {
+    prompts.push(match[2] || ''); // Default to empty string if no prompt
+  }
+
+  return prompts;
+};
 
 
-// Execute Python code on the backend
-const executePythonCode = async (code) => {
+// Start Python execution with interactive input handling
+const startPythonExecution = (code) => {
+  isExecutingPython.value = true;
+  waitingForInput.value = false;
+  inputResponses.value = [];
+  terminal.value.writeln('Executing Python script...');
+
+  // Parse code for input prompts
+  inputPromptQueue.value = parseInputPrompts(code);
+
+  if (inputPromptQueue.value.length > 0) {
+    // Start processing input prompts
+    processNextInputPrompt();
+  } else {
+    // No input needed, execute directly
+    executePythonCode(code, []);
+  }
+};
+
+// Process the next input prompt
+const processNextInputPrompt = () => {
+  if (inputPromptQueue.value.length > 0) {
+    currentInputPrompt.value = inputPromptQueue.value.shift();
+    terminal.value.write(currentInputPrompt.value);
+    currentInput.value = '';
+    waitingForInput.value = true;
+  } else {
+    // All inputs collected, replace input() with user responses
+    let code = editor.value.state.doc.toString();
+
+    inputResponses.value.forEach((input, index) => {
+      code = code.replace(/input\((["']?)(.*?)\1?\)/, `"${input}"`);
+    });
+
+    executePythonCode(code);
+  }
+};
+
+const executePythonCode = async (code, inputs = []) => {
   try {
     const response = await fetch('http://decode.local:8080/api/method/decode.api.execute', {
       method: 'POST',
@@ -417,26 +456,35 @@ const executePythonCode = async (code) => {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({ code, inputs }),
     });
 
     const data = await response.json();
-    console.log("API Response:", data); // Debugging API Response
 
-    // Print the output if available
-    if (data.message && data.message.output) {
-      data.message.output.split("\n").forEach(line => terminal.value.writeln(line));
+    if (data.message) {
+      if (data.message.output) {
+        data.message.output.split("\n").forEach(line => terminal.value.writeln(line));
+      }
+      if (data.message.error) {
+        terminal.value.writeln("Error:");
+        data.message.error.split("\n").forEach(line => terminal.value.writeln(line));
+      }
+    } else {
+      terminal.value.writeln("No output received.");
     }
-
-    // Print the error properly if available
-    if (data.message && data.message.error) {
-      terminal.value.writeln("Error:");
-      data.message.error.split("\n").forEach(line => terminal.value.writeln(line));
-    }
-
   } catch (error) {
     console.error("API Call Failed:", error);
     terminal.value.writeln(`Error executing Python code: ${error.message}`);
+  } finally {
+    // Reset states
+    isExecutingPython.value = false;
+    waitingForInput.value = false;
+    currentInput.value = '';
+    inputPromptQueue.value = [];
+    inputResponses.value = [];
+
+    // Show prompt
+    terminal.value.write('$ ');
   }
 };
 
@@ -446,7 +494,7 @@ onMounted(() => {
   codeEditorWidth.value = Math.floor(totalWidth * 0.7);
   consoleWidth.value = totalWidth - codeEditorWidth.value - 8;
 
-  // Initialize the terminal
+  // 🖥️ Terminal setup
   terminal.value = new Terminal({
     theme: {
       background: '#000000',
@@ -463,7 +511,6 @@ onMounted(() => {
     allowTransparency: true
   });
 
-
   fitAddon.value = new FitAddon();
   terminal.value.loadAddon(fitAddon.value);
 
@@ -471,22 +518,18 @@ onMounted(() => {
     terminal.value.open(terminalContainer.value);
     fitAddon.value.fit();
     terminal.value.writeln('Terminal initialized...');
-    terminal.value.writeln('$ ');
+    terminal.value.write('$ ');
   }
-  // Fetch file details when the component is mounted
-  fetchFileDetails();
-  initEditor ();
-  connectSocket();
-  startAutoRefresh();
+  startPeriodicFetch();
+  fetchFileDetails(); // 🔄 Load file contents
+  initEditor();       // 🧠 Set up the code editor
 
-  // Detect user activity
-  window.addEventListener("mousemove", resetInactivityTimer);
-  window.addEventListener("keydown", resetInactivityTimer);
-  // Add terminal input event listener
+  // ⌨️ Handle terminal input
   terminal.value.onData((data) => {
     handleTerminalInput(data);
   });
-  // Handle window resizing
+
+  // 📐 Resize terminal with container
   const resizeObserver = new ResizeObserver(() => {
     if (terminal.value && fitAddon.value) {
       fitAddon.value.fit();
@@ -497,108 +540,55 @@ onMounted(() => {
     resizeObserver.observe(terminalContainer.value);
   }
 
+  // 🔄 Adjust layout on browser resize
   window.addEventListener('resize', handleResize);
 
+  // 🔥 Real-time code sync
+  socket.on("code_update", ({ uuid, code }) => {
+    if (uuid === route.params.uuid && code !== codeContent.value) {
+      codeContent.value = code;
+
+      // 🧠 Replace entire editor content
+      editor.value?.dispatch({
+        changes: {
+          from: 0,
+          to: editor.value.state.doc.length,
+          insert: code,
+        }
+      });
+    }
+  });
+  // Start polling for file details
+  pollingInterval = setInterval(() => {
+    if (hasChanges.value) {
+      fetchFileDetails();
+      hasChanges.value = false; // Reset after fetching
+    }
+  }, 3000); // Every 3 seconds
 });
 
-onUnmounted(() => {
-  // First, disable and null any references to the resize observer
-  if (typeof resizeObserver !== 'undefined' && resizeObserver) {
-    resizeObserver.disconnect();
+onBeforeUnmount(() => {
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
   }
-  
-  // Clear all timers and intervals first
-  clearInterval(intervalId);
-  clearTimeout(inactivityTimeout);
-  
-  // Remove event listeners
+  socket.off("code_update");
   window.removeEventListener('resize', handleResize);
-  window.removeEventListener("mousemove", resetInactivityTimer);
-  window.removeEventListener("keydown", resetInactivityTimer);
-  
-  // Nullify the fitAddon reference without trying to dispose it
-  fitAddon.value = null;
-  
-  // Dispose the terminal - this should handle addon cleanup internally
-  if (terminal.value) {
-    // Create a local reference and null the reactive reference
-    const term = terminal.value;
-    terminal.value = null;
-    
-    // Now dispose the terminal with a small delay to ensure Vue has processed the nullification
-    setTimeout(() => {
-      try {
-        term.dispose();
-      } catch (error) {
-        console.log("Terminal disposal error:", error);
-      }
-    }, 0);
-  }
-  
-  // Clean up the editor
-  if (editor.value) {
-    editor.value.destroy();
-    editor.value = null;
-  }
-  
-  console.log("🛑 Cleanup complete, stopping auto-refresh.");
-  cleanupSocket();
+  if (saveTimeout) clearTimeout(saveTimeout);
+  if (fetchTimeout) clearTimeout(fetchTimeout);
+  if (periodicFetchInterval) clearInterval(periodicFetchInterval);
 });
-// Handle window resize
+
+
 const handleResize = () => {
   if (fitAddon.value) {
     fitAddon.value.fit();
   }
 };
 
-// Handle resizing of the editor and console
-const startResize = (e) => {
-  e.preventDefault();
-  const startX = e.clientX;
-  const startEditorWidth = codeEditorWidth.value;
-  const startConsoleWidth = consoleWidth.value;
-  const totalWidth = startEditorWidth + startConsoleWidth + 8;
-
-  const onMouseMove = (moveEvent) => {
-    moveEvent.preventDefault();
-    const dx = moveEvent.clientX - startX;
-
-    let newEditorWidth = startEditorWidth + dx;
-    let newConsoleWidth = startConsoleWidth - dx;
-
-    if (newEditorWidth < MIN_EDITOR_WIDTH) {
-      newEditorWidth = MIN_EDITOR_WIDTH;
-      newConsoleWidth = totalWidth - MIN_EDITOR_WIDTH - 8;
-    } else if (newConsoleWidth < MIN_CONSOLE_WIDTH) {
-      newConsoleWidth = MIN_CONSOLE_WIDTH;
-      newEditorWidth = totalWidth - MIN_CONSOLE_WIDTH - 8;
-    }
-
-    codeEditorWidth.value = newEditorWidth;
-    consoleWidth.value = newConsoleWidth;
-
-    if (fitAddon.value) {
-      setTimeout(() => fitAddon.value.fit(), 0);
-    }
-  };
-
-  const onMouseUp = () => {
-    document.removeEventListener('mousemove', onMouseMove);
-    document.removeEventListener('mouseup', onMouseUp);
-  };
-
-  document.addEventListener('mousemove', onMouseMove);
-  document.addEventListener('mouseup', onMouseUp);
-
-};
-
-// Save code function (PATCH request)
 const saveCode = async () => {
   try {
     const code = editor.value.state.doc.toString();
     const uuid = route.params.uuid;
-
-    // Encode parameters properly
     const encodedCode = encodeURIComponent(code);
     const encodedUuid = encodeURIComponent(uuid);
 
@@ -614,14 +604,10 @@ const saveCode = async () => {
     );
 
     if (!response.ok) {
-      // If the response is not successful, print status and status text
       throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
-
-    console.log('Response Data:', data); // Log the response for debugging
-
     if (data.message.message.status === 'success') {
       alert('Code saved successfully!');
     } else {
@@ -642,7 +628,6 @@ const shareCode = () => {
     console.error("Error encoding UUID:", error);
   }
 };
-
 </script>
 <style scoped>
 /* Prevent text selection during resize */
