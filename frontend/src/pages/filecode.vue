@@ -418,17 +418,18 @@ const parseInputPrompts = (code) => {
 
   return prompts;
 };
-const parseScanfPrompts = (code) => {
-  const regex = /printf\s*\((["'])(.*?)\1\);?\s*scanf\s*\(/g;
-  const prompts = [];
-  let match;
 
-  while ((match = regex.exec(code)) !== null) {
-    prompts.push(match[2]); // Just the prompt before scanf
-  }
+// const parseScanfPrompts = (code) => {
+//   const regex = /printf\s*\((["'])(.*?)\1\);?\s*scanf\s*\(/g;
+//   const prompts = [];
+//   let match;
 
-  return prompts;
-};
+//   while ((match = regex.exec(code)) !== null) {
+//     prompts.push(match[2]); // Just the prompt before scanf
+//   }
+
+//   return prompts;
+// };
 
 
 // Start Python execution with interactive input handling
