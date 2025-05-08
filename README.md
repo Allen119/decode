@@ -1,33 +1,27 @@
-### decode
+# 🚀 Coded Campus – Collaborative Coding & Course Management Platform
 
-ok
+Coded Campus is a Replit-inspired web application designed for real-time collaborative coding and structured course management. Built as a B.Tech final year project, it helps instructors manage coding courses while enabling students to code and collaborate live.
 
-### Installation
+## 🧩 Tech Stack
 
-You can install this app using the [bench](https://github.com/frappe/bench) CLI:
+- **Frontend**: Vue.js + Tailwind CSS  
+- **Backend**: Frappe (Python-based)  
+- **Database**: MariaDB  
+- **Editor**: CodeMirror  
+- **Terminal**: xterm.js  
+- **Real-time Communication**: WebSockets (via socket.io)  
+
+---
+Build With Hussain – Frappe learning resources. What his youtube videos for frappe installation and connection with Vue.js
+## 📁 Project Structure
 
 ```bash
-cd $PATH_TO_YOUR_BENCH
-bench get-app $URL_OF_THIS_REPO --branch develop
-bench install-app decode
-```
+decode/                # Frappe app module (backend)
+└── decode/            # Python backend logic with Doctypes, APIs, and models
 
-### Contributing
-
-This app uses `pre-commit` for code formatting and linting. Please [install pre-commit](https://pre-commit.com/#installation) and enable it for this repository:
-
-```bash
-cd apps/decode
-pre-commit install
-```
-
-Pre-commit is configured to use the following tools for checking and formatting your code:
-
-- ruff
-- eslint
-- prettier
-- pyupgrade
-
-### License
-
-mit
+src/                   # Vue.js frontend
+├── pages/             # Main application views (e.g., Editor, Dashboard)
+├── components/        # UI components like Navbar, CourseCard, etc.
+├── services/          # API service handlers
+├── router/            # Vue Router setup
+└── store/             # Vuex state management
