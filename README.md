@@ -8,7 +8,7 @@ Coded Campus is a Replit-inspired web application designed for real-time collabo
 - **Backend**: Frappe (Python-based)  
 - **Database**: MariaDB  
 - **Editor**: CodeMirror  
-- **Terminal**: xterm.js  
+- **Terminal**: xterm  
 - **Real-time Communication**: WebSockets (via socket.io)  
 
 ---
