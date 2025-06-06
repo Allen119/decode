@@ -21,7 +21,3 @@ decode/                # Frappe app module (backend)
 
 src/                   # Vue.js frontend
 ├── pages/             # Main application views (e.g., Editor, Dashboard)
-├── components/        # UI components like Navbar, CourseCard, etc.
-├── services/          # API service handlers
-├── router/            # Vue Router setup
-└── store/             # Vuex state management
